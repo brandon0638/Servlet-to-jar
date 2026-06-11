@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Map;
 
 @WebServlet(name = "FrontControllerServlet", urlPatterns = "/*")
 public class FrontControllerServlet extends HttpServlet{
@@ -18,5 +19,12 @@ public class FrontControllerServlet extends HttpServlet{
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException{
         processRequest(request,response);
+    }
+
+    protected void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException{
+        //recuperation url
+        StringBuffer requestURL = request.getRequestURL();
+        Sytem.out.println("=== nouvelle requete ====");
+        System.out.println("URL: " + requestURL + " .");
     }
 }
