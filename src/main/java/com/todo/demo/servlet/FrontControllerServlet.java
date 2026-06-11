@@ -40,5 +40,28 @@ public class FrontControllerServlet extends HttpServlet{
         }else{
             System.out.println("Aucun request param recu");
         }
+
+        //Afficher les parametre de contexte
+        String appName = getServletContext().getInitParameter("app-name");
+        String appVersion = getServletContext().getInitParameter("version");
+
+        if(appName != null){
+            System.out.println("Context param app-name: " + appName);
+
+        }
+        if(appVersion != null){
+            System.out.println("Contexte param version: " + appVersion);
+        }
+
+        //reponse html
+        response.setContentType("text/html");
+        response.getWriter().println("<!DOCTYPE html>");
+        response.getWriter().println("<html>");
+        response.getWriter().println("<head><title>FrontController Servlet</title></head>");
+        response.getWriter().println("<body>");
+        response.getWriter().println("<h1>FrontController Servlet</h1>");
+        response.getWriter().println("<p>URL : " + requestURL + "</p>");
+        response.getWriter().println("</body>");
+        response.getWriter().println("</html>");
     }
 }
