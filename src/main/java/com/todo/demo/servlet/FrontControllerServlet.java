@@ -26,5 +26,19 @@ public class FrontControllerServlet extends HttpServlet{
         StringBuffer requestURL = request.getRequestURL();
         Sytem.out.println("=== nouvelle requete ====");
         System.out.println("URL: " + requestURL + " .");
+
+        //afficher parametre requete
+        Map<String, String[]> paramMap = request.getParameterMap();
+
+        if(paramMap != null && !paramMap.isEmpty()){
+            System.out.println("Request parameters recus: ");
+            for(Map.Entry<String, String[]> entry : paramMap.entrySet()){
+                String paramName = entry.getKey();
+                String[] paramValues = entry.getValues();
+                System.out.println(" - " + paramName + " = " + String.join(", ", paramValues));
+            }
+        }else{
+            System.out.println("Aucun request param recu");
+        }
     }
 }
