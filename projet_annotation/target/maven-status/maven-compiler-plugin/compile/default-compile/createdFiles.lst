@@ -1,0 +1,4 @@
+com\monapp\config\WebConfig.class
+com\monapp\controller\MonController.class
+com\monapp\aspect\MonAspect.class
+com\monapp\annotation\MaPremiereAnnotation.class
