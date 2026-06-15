@@ -8,7 +8,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 @EnableWebMvc
-@EnableAspectJAutoProxy          // ← Active les aspects
+@EnableAspectJAutoProxy
 @ComponentScan({"com.monapp.controller", "com.monapp.aspect"})
 public class WebConfig implements WebMvcConfigurer {
 }
