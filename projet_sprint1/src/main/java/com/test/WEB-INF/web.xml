@@ -1,0 +1,15 @@
+<web-app>
+
+    <servlet>
+        <servlet-name>front</servlet-name>
+        <servlet-class>
+            com.servlet.FrontControllerServlet
+        </servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>front</servlet-name>
+        <url-pattern>/*</url-pattern>
+    </servlet-mapping>
+
+</web-app>
