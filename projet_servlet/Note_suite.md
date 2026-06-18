@@ -3,7 +3,7 @@
 
  - creer annotation pour class controller dans un package annotation-> (au niveau framework)
  - creer controller dans test et mettre notre annotation creer ici , les classes annoter sont reconnues dans notre framework
- - il y a des bouits de code soit au demarage de l'appilcation web que s'est executer 
+ - il y a des bouts de code soit au demarage de l'appilcation web que s'est executer 
 
  [code] -> demarage App web (utiliser un listener anaty servlet)
         -> premier appel du frontservlet(utiliser methode init appel une fois)

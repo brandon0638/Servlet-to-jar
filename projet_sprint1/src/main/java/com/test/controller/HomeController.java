@@ -1,6 +1,6 @@
-package com.test;
+package com.test.controller;
 
-import com.controller.*;
+import com.annotation.Controllerako;
 
 @Controllerako
 public class HomeController {

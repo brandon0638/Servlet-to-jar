@@ -1,6 +1,7 @@
 package com.test;
 
-import com.controller.*;
+import com.annotation.Controllerako;
+import com.test.controller.*;
 
 public class Main {
 

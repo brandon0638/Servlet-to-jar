@@ -1,4 +1,4 @@
-package com.controller;
+package com.annotation;
 
 import java.lang.annotation.*;
 
