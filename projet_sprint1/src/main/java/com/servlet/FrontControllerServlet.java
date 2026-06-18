@@ -30,4 +30,6 @@ public class FrontControllerServlet extends HttpServlet{
         out.println("<h1>URL actuelle</h1>");
         out.println("<p>" + url + "</p>");
     }
+
+    
 }
