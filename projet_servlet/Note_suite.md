@@ -17,5 +17,5 @@ Frontservletcontroller: variable ou attribut List<string> Listecontroller
 [annotationcontroller] -> tous les class dans classPath
                        -> donner une liste de tous les packages
 
-- ajouter dans web.xml un variable package qui contient les controllers
+- ajouter dans web.xml un variable "package" qui contient les controllers
 - il faut avoir un methode generaliser qui verifie si un annotatoin existe ou pas et ou il est au niveau class ou methode
