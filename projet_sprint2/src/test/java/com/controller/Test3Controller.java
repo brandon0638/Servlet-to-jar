@@ -1,4 +1,4 @@
-package com.test.controller;
+package test.com.controller;
 
 import com.annotation.Controllerako;
 
