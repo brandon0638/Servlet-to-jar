@@ -19,3 +19,20 @@ Frontservletcontroller: variable ou attribut List<string> Listecontroller
 
 - ajouter dans web.xml un variable "package" qui contient les controllers
 - il faut avoir un methode generaliser qui verifie si un annotatoin existe ou pas et ou il est au niveau class ou methode
+
+
+## Sprint 2
+
+- creer annotation type method(mila variable)
+    ex: EmpController deja annoter avec notre annotation
+        on a une methode list et par exemple l'annoter avec par exemple @urlMapping qui prend parametre("/emp/list")
+        on peut faire aussi url="/emp/list"
+        
+    le methode verifiena oe misy annotation url ve sa ts
+
+    on verifie juste par ca par exmple: /emp/list est dans la methode EmpController->liste ; /emp/new est dans la methode EmpController-.create
+
+    on a besoin du liste url donc en resumer
+
+    petit modif: quand url n;est pas dans url donc faire juste un throws urk n'existe pas
+    quand on connais pas url throws exception dire les listes des urls disponible, si on connais afficher juste la methode associer a ce url
