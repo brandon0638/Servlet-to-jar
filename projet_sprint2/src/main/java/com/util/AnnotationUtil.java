@@ -4,10 +4,11 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
+// import java.util.ArrayList;
+// import java.util.List;
+import java.util.*;
 
-import com.annotation.Controllerako;
+import com.annotation.*;
 
 public class AnnotationUtil {
 
@@ -97,6 +98,32 @@ public class AnnotationUtil {
         return result;
     }
 
-   
+    public static Map<String, Method> getUrlMappings(List<Class<?>> controllers) {
+        Map<String, Method> urlMappings = new HashMap<>();
+        
+        for (Class<?> controller : controllers) {
+            Method[] methods = controller.getDeclaredMethods();
+            
+            for (Method method : methods) {
+                if (method.isAnnotationPresent(UrlMapping.class)) {
+                    UrlMapping urlMapping = method.getAnnotation(UrlMapping.class);
+                    String url = urlMapping.value();
+                    
+                    // Vérifier si l'URL existe déjà (éviter les doublons)
+                    if (urlMappings.containsKey(url)) {
+                        System.out.println("ATTENTION : L'URL '" + url + "' est déjà utilisée par " + 
+                                        urlMappings.get(url).getDeclaringClass().getSimpleName() + 
+                                        "." + urlMappings.get(url).getName() + "()");
+                    } else {
+                        urlMappings.put(url, method);
+                        System.out.println("URL enregistrée : " + url + " → " + 
+                                        controller.getSimpleName() + "." + method.getName() + "()");
+                    }
+                }
+            }
+        }
+        
+        return urlMappings;
+    }
     
 }

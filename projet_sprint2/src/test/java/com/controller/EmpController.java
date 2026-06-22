@@ -21,4 +21,8 @@ public class EmpController{
     public void delete(){
 
     }
+    @UrlMapping("/")
+    public void bonjour(){
+
+    }
 }
