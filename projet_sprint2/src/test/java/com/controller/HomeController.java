@@ -2,7 +2,7 @@ package com.test.controller;
 
 import com.annotation.Controllerako;
 
-@Controllerako
+// @Controllerako
 public class HomeController {
 
     // public void hello() {
