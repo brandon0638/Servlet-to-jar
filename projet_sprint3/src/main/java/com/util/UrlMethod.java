@@ -1,6 +1,7 @@
 package com.util;
 
 import java.lang.reflect.Method;
+import java.util.Objects;
 
 public class UrlMethod{
 
@@ -28,7 +29,7 @@ public class UrlMethod{
             return false;
         }
         UrlMethod that = (UrlMethod) o;
-        return Objetcs.equals(method,that.method) && Objects.equals(httpMethod,that.httpMethod);
+        return Objects.equals(method,that.method) && Objects.equals(httpMethod,that.httpMethod);
 
     }
 
