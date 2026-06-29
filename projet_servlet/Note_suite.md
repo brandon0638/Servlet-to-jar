@@ -36,3 +36,11 @@ Frontservletcontroller: variable ou attribut List<string> Listecontroller
 
     petit modif: quand url n;est pas dans url donc faire juste un throws urk n'existe pas
     quand on connais pas url throws exception dire les listes des urls disponible, si on connais afficher juste la methode associer a ce url
+
+## Instruction Sprint 3:
+- Création classe UrlMethod(url, method="GET"/"POST")
+- Ajout attribut method pour l'annotation
+- Redifinir la fonction equals pour UrlMethod pour éviter les doublons
+
+## Instruction Sprint 3:
+- Executer la méthode associé au lien
