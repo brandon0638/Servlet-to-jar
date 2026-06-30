@@ -1,22 +1,31 @@
 package com.servlet;
 
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.lang.reflect.Method;
+import com.util.AnnotationUtil;
+import com.annotation.Controllerako;
+
+import javax.servlet.*;
+import javax.servlet.http.*;
+import java.io.*;
 import java.util.List;
-import java.util.Map;
-
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-
+import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 
 
 public class FrontControllerServlet extends HttpServlet{
 
+    private List<Class<?>> controllers;
+
+   @Override
+    public void init() {
+
+        ServletContext context = getServletContext();
+
+        String basePackage = context.getInitParameter("package");
+
+        controllers = AnnotationUtil.getControllers(basePackage);
+
+        
+    }
     
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException{
@@ -35,20 +44,23 @@ public class FrontControllerServlet extends HttpServlet{
     protected void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException{
         
         response.setContentType("text/html;charset=UTF-8");
-
         PrintWriter out = response.getWriter();
 
-        String context = request.getContextPath();
-        String uri = request.getRequestURI();
-        String url = uri.substring(context.length());
+        out.println("<h1>URL actuelle</h1>");
+        out.println("<p>" + request.getRequestURL() + "</p>");
 
-        out.println("<h1>URL actuelle: </h1>");
-        out.println("<p>" + url + "</p>");
+        out.println("<h2>Listes des controllers</h2>");
+        out.println("<ul>");
 
+        for (Class<?> c : controllers) {
+            
+            String simpleName = c.getSimpleName();
+            out.println("<li>" + simpleName + "</li>");
+        }
+
+        out.println("</ul>");
         
-       }
-        
-    
+    }
 
     
 
