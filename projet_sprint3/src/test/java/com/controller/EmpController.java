@@ -22,8 +22,8 @@ public class EmpController{
 
     }
     @UrlMapping("/")
-    public void accueil() {
-        System.out.println("Page d'accueil");
+    public String accueil() {
+        return "bonjour";
         // Cette méthode est vide
     }
 }

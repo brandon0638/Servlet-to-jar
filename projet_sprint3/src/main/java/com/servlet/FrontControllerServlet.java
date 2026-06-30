@@ -56,22 +56,21 @@ public class FrontControllerServlet extends HttpServlet{
         String url = request.getRequestURI().substring(request.getContextPath().length());
         String httpMethod = request.getMethod();
 
+        out.println("<h1>URL actuelle</h1>");
+        out.println("<p>" + request.getRequestURL() + "</p>");
+
+        out.println("<h2>Listes des controllers</h2>");
+        out.println("<ul>");
+        for (Class<?> c : controllers) {
+            out.println("<li>" + c.getSimpleName() + "</li>");
+        }
+        out.println("</ul>");
+
         try {
             if (urlMappings.containsKey(url)) {
                 UrlMethod um = urlMappings.get(url);
                 Method m = um.getMethod();
                 String expectedMethod = um.getHttpMethod();
-
-                // Afficher les infos de base
-                out.println("<h1>URL actuelle</h1>");
-                out.println("<p>" + request.getRequestURL() + "</p>");
-
-                out.println("<h2>Listes des controllers</h2>");
-                out.println("<ul>");
-                for (Class<?> c : controllers) {
-                    out.println("<li>" + c.getSimpleName() + "</li>");
-                }
-                out.println("</ul>");
 
                 out.println("<hr>");
                 out.println("<h3>URL demandee : " + url + "</h3>");
@@ -81,45 +80,53 @@ public class FrontControllerServlet extends HttpServlet{
                 out.println("<li><b>Methode HTTP recue :</b> " + httpMethod + "</li>");
                 out.println("</ul>");
 
-                // ===== SI URL = "/" AFFICHER LE FORMULAIRE =====
+                //AFFICHER LE FORMULAIRE POUR LA RACINE
                 if (url.equals("/")) {
                     out.println("<hr>");
-                    out.println("<h3>Formulaire POST - Créer un employé</h3>");
+                    out.println("<h3>Formulaire POST</h3>");
                     out.println("<form action=\"" + request.getContextPath() + "/emp/new\" method=\"POST\">");
-                    out.println("Nom : <input type=\"text\" name=\"nom\" placeholder=\"Nom de l'employé\">");
-                    out.println("<input type=\"submit\" value=\"Créer\">");
+                    out.println("Nom : <input type=\"text\" name=\"nom\" placeholder=\"entre ce que tu veux\">");
+                    out.println("<input type=\"submit\" value=\"Creer\">");
                     out.println("</form>");
-                    out.println("<hr>");
-                    out.println("<h3>Navigation (GET)</h3>");
-                    out.println("<ul>");
-                    out.println("<li><a href=\"" + request.getContextPath() + "/emp/list\">Liste des employés</a></li>");
-                    out.println("<li><a href=\"" + request.getContextPath() + "/emp/delete\">Supprimer un employé</a></li>");
-                    out.println("</ul>");
+                    
                 }
-                // =================================================
+                
 
                 // Vérification de la méthode HTTP
                 if (!expectedMethod.equalsIgnoreCase(httpMethod) && !expectedMethod.equalsIgnoreCase("ALL")) {
                     throw new Exception("Methode HTTP incorrecte. Attendu: " + expectedMethod + ", Recu: " + httpMethod);
                 }
 
-                out.println("<h2 style='color:green'>SUCCES</h2>");
-                out.println("<p style='color:green'>Methode executee avec succes</p>");
-
-                // Exécution de la méthode
+                //EXÉCUTION DE LA MÉTHODE ET RÉCUPÉRATION DE LA VALEUR RETOURNÉE
+                Object result = null;
                 try {
                     Object controllerInstance = m.getDeclaringClass().newInstance();
-                    m.invoke(controllerInstance);
+                    result = m.invoke(controllerInstance);
                 } catch (Exception ex) {
                     out.println("<p style='color:orange'>Erreur execution: " + ex.getMessage() + "</p>");
                 }
+
+                out.println("<h4 style='color:green'>SUCCES</h4>");
+                out.println("<p style='color:green'>Methode executee avec succes</p>");
+
+                //AFFICHER LA VALEUR RETOURNÉE
+                if (result != null) {
+                    out.println("<hr>");
+                    out.println("<h4 style='color:blue'>Valeur retournee :</h4>");
+                    out.println("<div style='background: #f0f8ff; padding: 15px; border-radius: 5px; border: 1px solid #b0d4e3;'>");
+                    out.println("<b>" + result.toString() + "</b>");
+                    out.println("</div>");
+                } else {
+                    out.println("<p style='color:gray'>Aucune valeur retournee (void)</p>");
+                }
+                
 
             } else {
                 throw new Exception("URL inexistante: " + url);
             }
         } catch (Exception e) {
             out.println("<hr>");
-            out.println("<h2 style='color:red'>ERREUR</h2>");
+            out.println("<h4 style='color:red'>ERREUR</h4>");
             out.println("<p><b>" + e.getMessage() + "</b></p>");
             out.println("<hr>");
             out.println("<h3>URLs disponibles</h3>");
