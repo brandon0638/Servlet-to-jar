@@ -1,7 +1,0 @@
-com\monapp\config\WebConfig.class
-com\monapp\controller\MonController.class
-com\monapp\annotation\MonLog.class
-com\monapp\controller\TestController.class
-com\monapp\aspect\MonAspect.class
-com\monapp\aspect\MonLogAspect.class
-com\monapp\annotation\MaPremiereAnnotation.class
