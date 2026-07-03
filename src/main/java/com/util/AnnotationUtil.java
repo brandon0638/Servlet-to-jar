@@ -4,11 +4,14 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
-// import java.util.ArrayList;
-// import java.util.List;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import com.annotation.*;
+import com.annotation.Controllerako;
+import com.annotation.UrlMapping;
 
 public class AnnotationUtil {
 
@@ -96,8 +99,8 @@ public class AnnotationUtil {
         return result;
     }
 
-    public static Map<String, Method> getUrlMappings(List<Class<?>> controllers) {
-        Map<String, Method> urlMappings = new HashMap<>();
+    public static Map<UrlMethod, Method> getUrlMappings(List<Class<?>> controllers) {
+        Map<UrlMethod, Method> urlMappings = new HashMap<>();
         
         for (Class<?> controller : controllers) {
             Method[] methods = controller.getDeclaredMethods();
@@ -105,17 +108,18 @@ public class AnnotationUtil {
             for (Method method : methods) {
                 if (method.isAnnotationPresent(UrlMapping.class)) {
                     UrlMapping urlMapping = method.getAnnotation(UrlMapping.class);
-                    String url = urlMapping.value();
+
+                    UrlMethod key = new UrlMethod(
+                        urlMapping.value(),
+                        urlMapping.method()
+                    );
                     
                     // Vérifier si l'URL existe déjà (éviter les doublons)
-                    if (urlMappings.containsKey(url)) {
-                        System.out.println("ATTENTION : L'URL '" + url + "' est déjà utilisée par " + 
-                                        urlMappings.get(url).getDeclaringClass().getSimpleName() + 
-                                        "." + urlMappings.get(url).getName() + "()");
+                    if (urlMappings.containsKey(key)) {
+                        System.out.println("ATTENTION : Route déjà utilisée -> " + key.getMethod() + " " + key.getUrl() + " par " + urlMappings.get(key).getDeclaringClass().getSimpleName() + "." + urlMappings.get(key).getName());
                     } else {
-                        urlMappings.put(url, method);
-                        System.out.println("URL enregistrée : " + url + " → " + 
-                                        controller.getSimpleName() + "." + method.getName() + "()");
+                        urlMappings.put(key, method);
+                        System.out.println("URL enregistrée : " + key.getMethod() + " " + key.getUrl() + " → " + controller.getSimpleName() + "." + method.getName());
                     }
                 }
             }
