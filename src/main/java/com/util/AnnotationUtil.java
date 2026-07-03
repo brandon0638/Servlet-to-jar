@@ -112,18 +112,18 @@ public class AnnotationUtil {
                     UrlMapping urlMapping = method.getAnnotation(UrlMapping.class);
 
                     UrlMethod key = new UrlMethod(
-                        urlMapping.value(),
-                        urlMapping.method()
+                            urlMapping.value(),
+                            urlMapping.method()
                     );
 
                     if (urlMappings.containsKey(key)) {
 
                         Method existing = urlMappings.get(key);
 
-                        System.out.println(
-                            "Route duplique : "
+                        throw new RuntimeException(
+                            "Route duplique: "
                             + key.getMethod() + " " + key.getUrl()
-                            + " utilse par "
+                            + " utilise par "
                             + existing.getDeclaringClass().getSimpleName()
                             + "." + existing.getName()
                         );
@@ -133,7 +133,7 @@ public class AnnotationUtil {
                         urlMappings.put(key, method);
 
                         System.out.println(
-                            "Route enregistre : "
+                            "Route enregistree : "
                             + key.getMethod() + " " + key.getUrl()
                             + " → "
                             + controller.getSimpleName()

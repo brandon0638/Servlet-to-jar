@@ -55,12 +55,12 @@ public class FrontControllerServlet extends HttpServlet{
         String httpMethod = request.getMethod();
 
         out.println("<h1>FRONT CONTROLLER</h1>");
-        out.println("<p><b>URL complète :</b> " + request.getRequestURL() + "</p>");
+        out.println("<p><b>URL complete :</b> " + request.getRequestURL() + "</p>");
         out.println("<p><b>Route :</b> " + url + "</p>");
-        out.println("<p><b>Méthode HTTP :</b> " + httpMethod + "</p>");
+        out.println("<p><b>Methode HTTP :</b> " + httpMethod + "</p>");
 
      
-        out.println("<h2>Controllers détectés</h2>");
+        out.println("<h2>Controllers detectes</h2>");
         out.println("<ul>");
         for (Class<?> c : controllers) {
             out.println("<li>" + c.getSimpleName() + "</li>");
@@ -75,9 +75,9 @@ public class FrontControllerServlet extends HttpServlet{
             Method m = urlMappings.get(key);
 
             out.println("<hr>");
-            out.println("<h2>ROUTE TROUVÉE</h2>");
+            out.println("<h2>ROUTE TROUVeE</h2>");
             out.println("<p><b>Controller :</b> " + m.getDeclaringClass().getSimpleName() + "</p>");
-            out.println("<p><b>Méthode :</b> " + m.getName() + "</p>");
+            out.println("<p><b>Methode :</b> " + m.getName() + "</p>");
             out.println("<p><b>URL :</b> " + url + "</p>");
             out.println("<p><b>HTTP :</b> " + httpMethod + "</p>");
 
