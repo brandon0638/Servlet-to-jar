@@ -1,6 +1,6 @@
 package com.servlet;
 
-import com.util.AnnotationUtil;
+import com.util.*;
 import com.annotation.*;
 
 import javax.servlet.*;
@@ -14,7 +14,7 @@ import java.lang.reflect.Field;
 public class FrontControllerServlet extends HttpServlet{
 
     private List<Class<?>> controllers;
-    private Map<String, Method> urlMappings;
+    private Map<UrlMethod, Method> urlMappings;
 
    @Override
     public void init() {
@@ -64,10 +64,15 @@ public class FrontControllerServlet extends HttpServlet{
         
         
         String url = request.getRequestURI().substring(request.getContextPath().length());
+
+        UrlMethod key = new UrlMethod(
+            url,
+            request.getMethod()
+        );
         
         try {
-            if (urlMappings.containsKey(url)) {
-                Method m = urlMappings.get(url);
+            if (urlMappings.containsKey(key)) {
+                Method m = urlMappings.get(key);
                 out.println("<hr>");
                 out.println("<h3>URL demandee : " + url + "</h3>");
                 out.println("<hr>");
@@ -87,10 +92,21 @@ public class FrontControllerServlet extends HttpServlet{
             out.println("<hr>");
             out.println("<h3>URLs disponibles</h3>");
             out.println("<ul>");
-            for (String u : urlMappings.keySet()) {
-                
-            out.println("<li>" + u + "</li>");
+
+            for (UrlMethod u : urlMappings.keySet()) {
+
+                out.println("<li>" + u.getMethod() + " " + u.getUrl() + "</li>");
+
+                if (u.getUrl().equals(url)) {
+                    out.println("</ul>");
+
+                    out.println("<p><b>Méthode HTTP attendue :</b> " + u.getMethod() + "</p>");
+                    out.println("<p><b>Méthode HTTP reçue :</b> " + request.getMethod() + "</p>");
+
+                    return;
+                }
             }
+
             out.println("</ul>");
 
         }
