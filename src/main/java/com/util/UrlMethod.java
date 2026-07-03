@@ -21,20 +21,15 @@ public class UrlMethod {
     }
 
     @Override
-    public boolean equals(Object obj) {
-
-        if (this == obj) return true;
-
-        if (obj == null || getClass() != obj.getClass()) return false;
-
-        UrlMethod other = (UrlMethod) obj;
-
-        return Objects.equals(url, other.url) && Objects.equals(method, other.method);
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof UrlMethod)) return false;
+        UrlMethod that = (UrlMethod) o;
+        return url.equals(that.url) && method.equals(that.method);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(url, method);
     }
-
 }
