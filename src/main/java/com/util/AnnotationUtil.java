@@ -100,31 +100,50 @@ public class AnnotationUtil {
     }
 
     public static Map<UrlMethod, Method> getUrlMappings(List<Class<?>> controllers) {
+
         Map<UrlMethod, Method> urlMappings = new HashMap<>();
-        
+
         for (Class<?> controller : controllers) {
-            Method[] methods = controller.getDeclaredMethods();
-            
-            for (Method method : methods) {
+
+            for (Method method : controller.getDeclaredMethods()) {
+
                 if (method.isAnnotationPresent(UrlMapping.class)) {
+
                     UrlMapping urlMapping = method.getAnnotation(UrlMapping.class);
 
                     UrlMethod key = new UrlMethod(
                         urlMapping.value(),
                         urlMapping.method()
                     );
-                    
-                    // Vérifier si l'URL existe déjà (éviter les doublons)
+
                     if (urlMappings.containsKey(key)) {
-                        System.out.println("ATTENTION : Route déjà utilisée -> " + key.getMethod() + " " + key.getUrl() + " par " + urlMappings.get(key).getDeclaringClass().getSimpleName() + "." + urlMappings.get(key).getName());
+
+                        Method existing = urlMappings.get(key);
+
+                        System.out.println(
+                            "Route duplique : "
+                            + key.getMethod() + " " + key.getUrl()
+                            + " utilse par "
+                            + existing.getDeclaringClass().getSimpleName()
+                            + "." + existing.getName()
+                        );
+
                     } else {
+
                         urlMappings.put(key, method);
-                        System.out.println("URL enregistrée : " + key.getMethod() + " " + key.getUrl() + " → " + controller.getSimpleName() + "." + method.getName());
+
+                        System.out.println(
+                            "Route enregistre : "
+                            + key.getMethod() + " " + key.getUrl()
+                            + " → "
+                            + controller.getSimpleName()
+                            + "." + method.getName()
+                        );
                     }
                 }
             }
         }
-        
+
         return urlMappings;
     }
    

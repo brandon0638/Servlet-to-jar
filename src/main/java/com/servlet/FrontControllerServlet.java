@@ -48,63 +48,50 @@ public class FrontControllerServlet extends HttpServlet{
         response.setContentType("text/html;charset=UTF-8");
         PrintWriter out = response.getWriter();
 
-        out.println("<h1>URL actuelle</h1>");
-        out.println("<p>" + request.getRequestURL() + "</p>");
+        
+        String contextPath = request.getContextPath();
+        String uri = request.getRequestURI();
+        String url = uri.substring(contextPath.length());
+        String httpMethod = request.getMethod();
 
-        out.println("<h2>Listes des controllers</h2>");
+        out.println("<h1>FRONT CONTROLLER</h1>");
+        out.println("<p><b>URL complète :</b> " + request.getRequestURL() + "</p>");
+        out.println("<p><b>Route :</b> " + url + "</p>");
+        out.println("<p><b>Méthode HTTP :</b> " + httpMethod + "</p>");
+
+     
+        out.println("<h2>Controllers détectés</h2>");
         out.println("<ul>");
-
         for (Class<?> c : controllers) {
-            
-            String simpleName = c.getSimpleName();
-            out.println("<li>" + simpleName + "</li>");
+            out.println("<li>" + c.getSimpleName() + "</li>");
         }
-
         out.println("</ul>");
-        
-        
-        String url = request.getRequestURI().substring(request.getContextPath().length());
 
-        UrlMethod key = new UrlMethod(
-            url,
-            request.getMethod()
-        );
-        
-        try {
-            if (urlMappings.containsKey(key)) {
-                Method m = urlMappings.get(key);
-                out.println("<hr>");
-                out.println("<h3>URL demandee : " + url + "</h3>");
-                out.println("<hr>");
-                out.println("<ul>");
-                out.println("<li>" + m.getDeclaringClass().getSimpleName() + "." + m.getName() + "() </li>");
-                out.println("</ul>");
+    
+        UrlMethod key = new UrlMethod(url, httpMethod);
 
-            } else {
-                
+        if (urlMappings.containsKey(key)) {
 
-                throw new Exception("<hr><h3>URL inexistante: " + url + "</h3>");
-                
+            Method m = urlMappings.get(key);
 
-            }
-        } catch (Exception e) {
-            out.println("<p><b>" + e.getMessage() + "</b></p>");
             out.println("<hr>");
-            out.println("<h3>URLs disponibles</h3>");
+            out.println("<h2>ROUTE TROUVÉE</h2>");
+            out.println("<p><b>Controller :</b> " + m.getDeclaringClass().getSimpleName() + "</p>");
+            out.println("<p><b>Méthode :</b> " + m.getName() + "</p>");
+            out.println("<p><b>URL :</b> " + url + "</p>");
+            out.println("<p><b>HTTP :</b> " + httpMethod + "</p>");
+
+        } else {
+
+            out.println("<hr>");
+            out.println("<h2>ROUTE INEXISTANTE</h2>");
+            out.println("<p style='color:red;'><b>" + url + "</b></p>");
+
+            out.println("<h3>Routes disponibles :</h3>");
             out.println("<ul>");
 
             for (UrlMethod u : urlMappings.keySet()) {
-
                 out.println("<li>" + u.getMethod() + " " + u.getUrl() + "</li>");
-
-                if (u.getUrl().equals(url)) {
-                    out.println("</ul>");
-
-                    out.println("<p><b>Méthode HTTP attendue :</b> " + u.getMethod() + "</p>");
-                    out.println("<p><b>Méthode HTTP reçue :</b> " + request.getMethod() + "</p>");
-
-                    return;
-                }
             }
 
             out.println("</ul>");
