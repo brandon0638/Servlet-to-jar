@@ -36,7 +36,7 @@ public class FrontControllerServlet extends HttpServlet{
         response.setContentType("text/html;charset=UTF-8");
         PrintWriter out = response.getWriter();
 
-        // Récupération des données initialisées par le Listener
+        // Récupération des données depuis le Listener
         ServletContext context = getServletContext();
 
         controllers = (List<Class<?>>) context.getAttribute("controllers");
@@ -45,21 +45,20 @@ public class FrontControllerServlet extends HttpServlet{
 
         String contextPath = request.getContextPath();
         String uri = request.getRequestURI();
-        String url = uri.substring(contextPath.length());
-        String httpMethod = request.getMethod();
+        String url = uri.substring(contextPath.length()).trim();
+        String httpMethod = request.getMethod().trim().toUpperCase();
 
         out.println("<h1>FRONT CONTROLLER</h1>");
         out.println("<p><b>URL complete :</b> " + request.getRequestURL() + "</p>");
         out.println("<p><b>Route :</b> " + url + "</p>");
         out.println("<p><b>Methode HTTP :</b> " + httpMethod + "</p>");
 
+        // Liste des contrôleurs
         out.println("<h2>Controllers detectes</h2>");
         out.println("<ul>");
-
         for (Class<?> c : controllers) {
             out.println("<li>" + c.getSimpleName() + "</li>");
         }
-
         out.println("</ul>");
 
         UrlMethod key = new UrlMethod(url, httpMethod);
@@ -78,18 +77,21 @@ public class FrontControllerServlet extends HttpServlet{
             try {
 
                 Object controller = m.getDeclaringClass()
-                                     .getDeclaredConstructor()
-                                     .newInstance();
+                        .getDeclaredConstructor()
+                        .newInstance();
 
                 Object result = m.invoke(controller);
 
-                out.println("<p><b>Valeur retournee :</b> " + result + "</p>");
+                if (result != null) {
+                    out.println("<p><b>Valeur retournee :</b> " + result + "</p>");
+                }
 
             } catch (Exception e) {
 
-                out.println("<p style='color:red;'>" + e.getMessage() + "</p>");
-                e.printStackTrace();
-
+                out.println("<p style='color:red;'>Erreur lors de l'invocation :</p>");
+                out.println("<pre>");
+                e.printStackTrace(out);
+                out.println("</pre>");
             }
 
         } else {
