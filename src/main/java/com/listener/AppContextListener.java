@@ -27,5 +27,10 @@ public class AppContextListener implements ServletContextListener{
 
         System.out.println("Framework initialise via Listener !");
     }
+
+    @Override
+    public void contextDestroyed(ServletContextEvent sce) {
+        System.out.println("Application arretee");
+    }
     
 }

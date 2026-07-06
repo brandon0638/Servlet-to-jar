@@ -16,18 +16,6 @@ public class FrontControllerServlet extends HttpServlet{
     private List<Class<?>> controllers;
     private Map<UrlMethod, Method> urlMappings;
 
-   @Override
-    public void init() {
-
-        ServletContext context = getServletContext();
-
-        String basePackage = context.getInitParameter("package");
-
-        controllers = AnnotationUtil.getControllers(basePackage);
-        urlMappings = AnnotationUtil.getUrlMappings(controllers);
-
-        
-    }
     
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException{
@@ -48,7 +36,13 @@ public class FrontControllerServlet extends HttpServlet{
         response.setContentType("text/html;charset=UTF-8");
         PrintWriter out = response.getWriter();
 
-        
+        // Récupération des données initialisées par le Listener
+        ServletContext context = getServletContext();
+
+        controllers = (List<Class<?>>) context.getAttribute("controllers");
+
+        urlMappings = (Map<UrlMethod, Method>) context.getAttribute("urlMappings");
+
         String contextPath = request.getContextPath();
         String uri = request.getRequestURI();
         String url = uri.substring(contextPath.length());
@@ -59,15 +53,15 @@ public class FrontControllerServlet extends HttpServlet{
         out.println("<p><b>Route :</b> " + url + "</p>");
         out.println("<p><b>Methode HTTP :</b> " + httpMethod + "</p>");
 
-     
         out.println("<h2>Controllers detectes</h2>");
         out.println("<ul>");
+
         for (Class<?> c : controllers) {
             out.println("<li>" + c.getSimpleName() + "</li>");
         }
+
         out.println("</ul>");
 
-    
         UrlMethod key = new UrlMethod(url, httpMethod);
 
         if (urlMappings.containsKey(key)) {
@@ -75,7 +69,7 @@ public class FrontControllerServlet extends HttpServlet{
             Method m = urlMappings.get(key);
 
             out.println("<hr>");
-            out.println("<h2>ROUTE TROUVeE</h2>");
+            out.println("<h2>ROUTE TROUVEE</h2>");
             out.println("<p><b>Controller :</b> " + m.getDeclaringClass().getSimpleName() + "</p>");
             out.println("<p><b>Methode :</b> " + m.getName() + "</p>");
             out.println("<p><b>URL :</b> " + url + "</p>");
@@ -84,15 +78,18 @@ public class FrontControllerServlet extends HttpServlet{
             try {
 
                 Object controller = m.getDeclaringClass()
-                                    .getDeclaredConstructor()
-                                    .newInstance();
+                                     .getDeclaredConstructor()
+                                     .newInstance();
 
                 Object result = m.invoke(controller);
 
-                out.println("Valeur retournee: " + result);
+                out.println("<p><b>Valeur retournee :</b> " + result + "</p>");
 
             } catch (Exception e) {
+
+                out.println("<p style='color:red;'>" + e.getMessage() + "</p>");
                 e.printStackTrace();
+
             }
 
         } else {
