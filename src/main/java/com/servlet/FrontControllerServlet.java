@@ -81,6 +81,20 @@ public class FrontControllerServlet extends HttpServlet{
             out.println("<p><b>URL :</b> " + url + "</p>");
             out.println("<p><b>HTTP :</b> " + httpMethod + "</p>");
 
+            try {
+
+                Object controller = m.getDeclaringClass()
+                                    .getDeclaredConstructor()
+                                    .newInstance();
+
+                Object result = m.invoke(controller);
+
+                out.println("Valeur retournee: " + result);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
         } else {
 
             out.println("<hr>");
