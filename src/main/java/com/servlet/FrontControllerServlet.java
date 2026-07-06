@@ -89,7 +89,7 @@ public class FrontControllerServlet extends HttpServlet{
 
                 Object result = m.invoke(controller);
 
-                out.println(result);
+                out.println("Valeur retournee: " + result);
 
             } catch (Exception e) {
                 e.printStackTrace();
