@@ -66,6 +66,13 @@ public class FrontControllerServlet extends HttpServlet {
 
         processRequest(request,response);
 
+        if (controllers == null || urlMappings == null) {
+            throw new ServletException(
+                "Erreur : Listener non initialise ou donnees manquantes"
+            );
+        }
+
+        System.out.println("FrontController initialise !");
     }
 
 
@@ -219,6 +226,7 @@ public class FrontControllerServlet extends HttpServlet {
         }
 
 
+    }
 
     }
 
