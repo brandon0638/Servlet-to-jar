@@ -8,15 +8,15 @@ public class ModelAndView {
 
     private String url;
 
-    private Map<String, Object> attribute;
+    private Map<String,Object> attribute;
 
 
 
     public ModelAndView(String url){
 
         this.url = url;
-
         this.attribute = new HashMap<>();
+
     }
 
 
@@ -28,23 +28,17 @@ public class ModelAndView {
 
 
 
-    public void setUrl(String url){
-
-        this.url = url;
-    }
-
-
-
-    public Map<String, Object> getAttribute(){
+    public Map<String,Object> getAttribute(){
 
         return attribute;
     }
 
 
 
-    public void addAttribute(String key, Object value){
+    public void addAttribute(String key,Object value){
 
-        attribute.put(key, value);
+        attribute.put(key,value);
+
     }
 
 }
