@@ -1,6 +1,7 @@
 package com.servlet;
 
 import com.util.*;
+import com.model.ModelAndView;
 
 import javax.servlet.*;
 import javax.servlet.http.*;
@@ -10,21 +11,60 @@ import java.util.*;
 
 public class FrontControllerServlet extends HttpServlet {
 
+
     private List<Class<?>> controllers;
+
     private Map<UrlMethod, Method> urlMappings;
+
+    private String prefix;
+
+    private String suffix;
+
 
 
     @Override
     public void init() throws ServletException {
 
-        // Récupération du contexte global
+
         ServletContext context = getServletContext();
 
-        // Récupération des données préparées par le Listener
+
+        // Récupération des données initialisées par le Listener
+
         controllers = (List<Class<?>>) context.getAttribute("controllers");
+
 
         urlMappings = (Map<UrlMethod, Method>) context.getAttribute("urlMappings");
 
+
+
+        // Récupération prefix et suffix depuis web.xml
+
+        prefix = context.getInitParameter("prefix");
+
+        suffix = context.getInitParameter("suffix");
+
+
+
+        if(controllers == null || urlMappings == null){
+
+            throw new ServletException("Erreur : Listener non initialise");
+
+        }
+
+
+        System.out.println("FrontController initialise !");
+
+    }
+
+
+
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+
+
+        processRequest(request,response);
 
         if (controllers == null || urlMappings == null) {
             throw new ServletException(
@@ -36,86 +76,54 @@ public class FrontControllerServlet extends HttpServlet {
     }
 
 
-    @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-
-        processRequest(request, response);
-    }
-
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 
-        processRequest(request, response);
+
+        processRequest(request,response);
+
     }
+
+
+
 
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 
 
-        response.setContentType("text/html;charset=UTF-8");
-
-        PrintWriter out = response.getWriter();
-
 
         String contextPath = request.getContextPath();
 
+
         String uri = request.getRequestURI();
 
-        String url = uri.substring(contextPath.length());
 
-
-        String httpMethod = request.getMethod()
-                                   .trim()
-                                   .toUpperCase();
+        String url = uri.substring(contextPath.length()).trim();
 
 
 
-        out.println("<h1>FRONT CONTROLLER</h1>");
-
-        out.println("<p><b>Route :</b> " + url + "</p>");
-
-        out.println("<p><b>Methode HTTP :</b> " + httpMethod + "</p>");
-
-
-
-        // Affichage des controllers détectés
-
-        out.println("<h2>Controllers detectes</h2>");
-
-        out.println("<ul>");
-
-        for(Class<?> c : controllers){
-
-            out.println("<li>" + c.getSimpleName() + "</li>");
-        }
-
-        out.println("</ul>");
+        String httpMethod =
+            request.getMethod()
+                   .trim()
+                   .toUpperCase();
 
 
 
-        UrlMethod key = new UrlMethod(url, httpMethod);
 
-
+        UrlMethod key = new UrlMethod(url,httpMethod);
 
         if(urlMappings.containsKey(key)){
 
 
+
             Method method = urlMappings.get(key);
-
-
-            out.println("<hr>");
-            out.println("<h2>ROUTE TROUVEE</h2>");
-
-            out.println("<p><b>Controller :</b> " + method.getDeclaringClass().getSimpleName() + "</p>");
-
-
-            out.println("<p><b>Methode :</b> " + method.getName() + "</p>");
-
-
 
             try {
 
+
+
+                // création du controller
 
                 Object controller =
                     method.getDeclaringClass()
@@ -124,38 +132,77 @@ public class FrontControllerServlet extends HttpServlet {
 
 
 
+
+                // appel de la méthode
+
                 Object result = method.invoke(controller);
 
+                if(result instanceof ModelAndView){
 
 
-                if(result != null){
 
-                    out.println("<p><b>Retour :</b> " + result + "</p>");
+                    ModelAndView mv = (ModelAndView) result;
+
+                    for(String attributeName : mv.getAttribute().keySet()){
+
+                        request.setAttribute(attributeName,mv.getAttribute().get(attributeName));
+
+                    }
+
+
+                    String page = prefix + mv.getUrl() + suffix;
+
+                    RequestDispatcher dispatcher =request.getRequestDispatcher(page);
+
+                    dispatcher.forward(request,response);
+
+
+
+                }else{
+
+
+                    // Cas où le controller retourne autre chose
+
+                    response.setContentType("text/html;charset=UTF-8");
+
+
+                    PrintWriter out = response.getWriter();
+
+
+                    out.println(result);
+
+
                 }
 
 
 
-            } catch(Exception e){
 
 
-                out.println("<p style='color:red;'>Erreur invocation</p>");
+            }catch(Exception e){
 
 
-                out.println("<pre>");
+                throw new ServletException("Erreur invocation controller", e);
 
-                e.printStackTrace(out);
-
-                out.println("</pre>");
             }
+
+
 
 
 
         }else{
 
 
-            out.println("<hr>");
 
-            out.println("<h2 style='color:red;'>ROUTE INEXISTANTE</h2>");
+            response.setContentType("text/html;charset=UTF-8");
+
+
+            PrintWriter out = response.getWriter();
+
+
+
+            out.println("<h1>404 NOT FOUND</h1>");
+
+            out.println("<p>Route inexistante : " + url + "</p>");
 
 
 
@@ -164,10 +211,12 @@ public class FrontControllerServlet extends HttpServlet {
             out.println("<ul>");
 
 
+
             for(UrlMethod u : urlMappings.keySet()){
 
 
                 out.println("<li>" + u.getMethod() + " " + u.getUrl() + "</li>");
+
 
             }
 
@@ -175,6 +224,9 @@ public class FrontControllerServlet extends HttpServlet {
             out.println("</ul>");
 
         }
+
+
+    }
 
     }
 
