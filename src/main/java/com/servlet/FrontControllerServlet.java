@@ -1,119 +1,181 @@
 package com.servlet;
 
 import com.util.*;
-import com.annotation.*;
 
 import javax.servlet.*;
 import javax.servlet.http.*;
 import java.io.*;
-import java.util.*;
 import java.lang.reflect.Method;
-import java.lang.reflect.Field;
+import java.util.*;
 
-
-public class FrontControllerServlet extends HttpServlet{
+public class FrontControllerServlet extends HttpServlet {
 
     private List<Class<?>> controllers;
     private Map<UrlMethod, Method> urlMappings;
 
-    
-    @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException{
-        processRequest(request,response);
-        
-
-    }
 
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException{
-        processRequest(request,response);
-        
-    }
+    public void init() throws ServletException {
 
-    
-    protected void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException{
-        
-        response.setContentType("text/html;charset=UTF-8");
-        PrintWriter out = response.getWriter();
-
-        // Récupération des données depuis le Listener
+        // Récupération du contexte global
         ServletContext context = getServletContext();
 
+        // Récupération des données préparées par le Listener
         controllers = (List<Class<?>>) context.getAttribute("controllers");
 
         urlMappings = (Map<UrlMethod, Method>) context.getAttribute("urlMappings");
 
+
+        if (controllers == null || urlMappings == null) {
+            throw new ServletException(
+                "Erreur : Listener non initialise ou donnees manquantes"
+            );
+        }
+
+        System.out.println("FrontController initialise !");
+    }
+
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+
+        processRequest(request, response);
+    }
+
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+
+        processRequest(request, response);
+    }
+
+
+    protected void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+
+
+        response.setContentType("text/html;charset=UTF-8");
+
+        PrintWriter out = response.getWriter();
+
+
         String contextPath = request.getContextPath();
+
         String uri = request.getRequestURI();
-        String url = uri.substring(contextPath.length()).trim();
-        String httpMethod = request.getMethod().trim().toUpperCase();
+
+        String url = uri.substring(contextPath.length());
+
+
+        String httpMethod = request.getMethod()
+                                   .trim()
+                                   .toUpperCase();
+
+
 
         out.println("<h1>FRONT CONTROLLER</h1>");
-        out.println("<p><b>URL complete :</b> " + request.getRequestURL() + "</p>");
+
         out.println("<p><b>Route :</b> " + url + "</p>");
+
         out.println("<p><b>Methode HTTP :</b> " + httpMethod + "</p>");
 
-        // Liste des contrôleurs
+
+
+        // Affichage des controllers détectés
+
         out.println("<h2>Controllers detectes</h2>");
+
         out.println("<ul>");
-        for (Class<?> c : controllers) {
+
+        for(Class<?> c : controllers){
+
             out.println("<li>" + c.getSimpleName() + "</li>");
         }
+
         out.println("</ul>");
+
+
 
         UrlMethod key = new UrlMethod(url, httpMethod);
 
-        if (urlMappings.containsKey(key)) {
 
-            Method m = urlMappings.get(key);
+
+        if(urlMappings.containsKey(key)){
+
+
+            Method method = urlMappings.get(key);
+
 
             out.println("<hr>");
             out.println("<h2>ROUTE TROUVEE</h2>");
-            out.println("<p><b>Controller :</b> " + m.getDeclaringClass().getSimpleName() + "</p>");
-            out.println("<p><b>Methode :</b> " + m.getName() + "</p>");
-            out.println("<p><b>URL :</b> " + url + "</p>");
-            out.println("<p><b>HTTP :</b> " + httpMethod + "</p>");
+
+            out.println("<p><b>Controller :</b> " + method.getDeclaringClass().getSimpleName() + "</p>");
+
+
+            out.println("<p><b>Methode :</b> " + method.getName() + "</p>");
+
+
 
             try {
 
-                Object controller = m.getDeclaringClass()
-                        .getDeclaredConstructor()
-                        .newInstance();
 
-                Object result = m.invoke(controller);
+                Object controller =
+                    method.getDeclaringClass()
+                          .getDeclaredConstructor()
+                          .newInstance();
 
-                if (result != null) {
-                    out.println("<p><b>Valeur retournee :</b> " + result + "</p>");
+
+
+                Object result = method.invoke(controller);
+
+
+
+                if(result != null){
+
+                    out.println("<p><b>Retour :</b> " + result + "</p>");
                 }
 
-            } catch (Exception e) {
 
-                out.println("<p style='color:red;'>Erreur lors de l'invocation :</p>");
+
+            } catch(Exception e){
+
+
+                out.println("<p style='color:red;'>Erreur invocation</p>");
+
+
                 out.println("<pre>");
+
                 e.printStackTrace(out);
+
                 out.println("</pre>");
             }
 
-        } else {
+
+
+        }else{
+
 
             out.println("<hr>");
-            out.println("<h2>ROUTE INEXISTANTE</h2>");
-            out.println("<p style='color:red;'><b>" + url + "</b></p>");
+
+            out.println("<h2 style='color:red;'>ROUTE INEXISTANTE</h2>");
+
+
 
             out.println("<h3>Routes disponibles :</h3>");
+
             out.println("<ul>");
 
-            for (UrlMethod u : urlMappings.keySet()) {
+
+            for(UrlMethod u : urlMappings.keySet()){
+
+
                 out.println("<li>" + u.getMethod() + " " + u.getUrl() + "</li>");
+
             }
+
 
             out.println("</ul>");
 
         }
-        
+
     }
-
-    
-
 
 }
