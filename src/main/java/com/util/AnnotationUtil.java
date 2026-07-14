@@ -1,151 +1,162 @@
 package com.util;
 
-import java.io.File;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import com.annotation.Controllerako;
 import com.annotation.UrlMapping;
+import com.exception.UrlNotFoundException;
+
+import java.io.File;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.util.*;
+import org.springframework.context.ApplicationContext;
 
 public class AnnotationUtil {
 
-    public static List<Class<?>> getControllers(String basePackage) {
+    private static List<Class<?>> classes = new ArrayList<>();
+
+    public static void scanPackage(String basePackage) throws Exception {
+
+        classes = new ArrayList<>();
+
+        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+
+        String path = basePackage.replace(".", "/");
+
+        Enumeration<URL> resources = loader.getResources(path);
+
+        while(resources.hasMoreElements()){
+
+            URL resource = resources.nextElement();
+
+            File directory = new File(resource.toURI());
+
+            classes.addAll(findClasses(directory, basePackage));
+        }
+    }
+
+
+    private static List<Class<?>> findClasses(File directory,String packageName) throws Exception{
+
         List<Class<?>> result = new ArrayList<>();
-        List<Class<?>> classes = getClasses(basePackage);
-        
-        for (Class<?> c : classes) {
-            if (c.isAnnotationPresent(Controllerako.class)) {
-                result.add(c);
+
+        if(!directory.exists())
+            return result;
+
+
+        File[] files = directory.listFiles();
+
+        if(files == null)
+            return result;
+
+
+        for(File file : files){
+
+            if(file.getName().endsWith(".class")){
+
+                String className = packageName + "." + file.getName().replace(".class","");
+
+                result.add(Class.forName(className));
+
             }
         }
+
         return result;
     }
 
-    public static List<Class<?>> getClasses(String basePackage) {
 
-        List<Class<?>> classes = new ArrayList<>();
+    public static void scanControllersInPackage(String basePackage,Map<UrlMethod,RouteMapping> routes) throws Exception {
+        scanPackage(basePackage);
 
-        try {
-            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        for(Class<?> c : classes){
 
-            String path = basePackage.replace(".", "/");
+            if(c.isAnnotationPresent(Controllerako.class)){
 
-            Enumeration<URL> resources = cl.getResources(path);
+                scanMethod(routes,c);
 
-            while (resources.hasMoreElements()) {
+            }
+        }
+    }
 
-                URL resource = resources.nextElement();
 
-                File dir = new File(resource.toURI());
+    private static void scanMethod(Map<UrlMethod,RouteMapping> routes,Class<?> controller){
 
-                if (!dir.exists()) continue;
 
-                for (File file : dir.listFiles()) {
+        for(Method method : controller.getDeclaredMethods()){
 
-                    if (file.getName().endsWith(".class")) {
+            if(method.isAnnotationPresent(UrlMapping.class)){
+                UrlMapping mapping = method.getAnnotation(UrlMapping.class);
+                UrlMethod key = new UrlMethod(mapping.value(),mapping.method());
 
-                        String className = basePackage + "." +
-                                file.getName().replace(".class", "");
 
-                        try {
-                            classes.add(Class.forName(className));
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }
+                RouteMapping route = new RouteMapping(controller,method);
+
+                if(routes.containsKey(key)){
+
+                    throw new RuntimeException("Route déjà utilisée : " + key.getMethod() + " " + key.getUrl());
                 }
-            }
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
 
-        return classes;
-    }
+                routes.put(key,route);
 
-    public static List<Method> getAnnotatedMethods(Class<?> c,
-            Class annotation) {
 
-        List<Method> result = new ArrayList<>();
+                System.out.println(
+                        "Route enregistrée : "
+                        + key.getMethod()
+                        + " "
+                        + key.getUrl()
+                        + " -> "
+                        + controller.getSimpleName()
+                        + "." + method.getName()
+                );
 
-        for (Method m : c.getDeclaredMethods()) {
-
-            if (m.isAnnotationPresent(annotation)) {
-                result.add(m);
             }
         }
-
-        return result;
     }
 
-    public static List<Field> getAnnotatedFields(Class<?> c,
-            Class annotation) {
 
-        List<Field> result = new ArrayList<>();
+    public static Object invoke(RouteMapping route,ApplicationContext springContext) throws Exception {
 
-        for (Field f : c.getDeclaredFields()) {
 
-            if (f.isAnnotationPresent(annotation)) {
-                result.add(f);
+        Object controller = springContext.getBean(route.getController());
+
+
+        return route.getMethod()
+                    .invoke(controller);
+
+    }
+
+
+    public static RouteMapping getRoute(UrlMethod key,Map<UrlMethod,RouteMapping> routes){
+
+        RouteMapping route = routes.get(key);
+
+        if(route == null){
+
+            StringBuilder msg = new StringBuilder();
+            msg.append("Route inexistante : ")
+               .append(key.getMethod())
+               .append(" ")
+               .append(key.getUrl())
+               .append("\n\nRoutes disponibles :\n");
+
+
+            for(Map.Entry<UrlMethod,RouteMapping> e : routes.entrySet()){
+
+                msg.append(e.getKey().getMethod())
+                   .append(" ")
+                   .append(e.getKey().getUrl())
+                   .append(" -> ")
+                   .append(e.getValue().getController().getSimpleName())
+                   .append(".")
+                   .append(e.getValue().getMethod().getName())
+                   .append("\n");
             }
+
+
+            throw new UrlNotFoundException(msg.toString());
         }
 
-        return result;
+
+        return route;
     }
-
-    public static Map<UrlMethod, Method> getUrlMappings(List<Class<?>> controllers) {
-
-        Map<UrlMethod, Method> urlMappings = new HashMap<>();
-
-        for (Class<?> controller : controllers) {
-
-            for (Method method : controller.getDeclaredMethods()) {
-
-                if (method.isAnnotationPresent(UrlMapping.class)) {
-
-                    UrlMapping urlMapping = method.getAnnotation(UrlMapping.class);
-
-                    UrlMethod key = new UrlMethod(
-                            urlMapping.value(),
-                            urlMapping.method()
-                    );
-
-                    if (urlMappings.containsKey(key)) {
-
-                        Method existing = urlMappings.get(key);
-
-                        throw new RuntimeException(
-                            "Route duplique: "
-                            + key.getMethod() + " " + key.getUrl()
-                            + " utilise par "
-                            + existing.getDeclaringClass().getSimpleName()
-                            + "." + existing.getName()
-                        );
-
-                    } else {
-
-                        urlMappings.put(key, method);
-
-                        System.out.println(
-                            "Route enregistree : "
-                            + key.getMethod() + " " + key.getUrl()
-                            + " → "
-                            + controller.getSimpleName()
-                            + "." + method.getName()
-                        );
-                    }
-                }
-            }
-        }
-
-        return urlMappings;
-    }
-   
-    
 }
