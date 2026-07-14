@@ -45,6 +45,13 @@ public class FrontControllerServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request,HttpServletResponse response) throws ServletException,IOException {
         processRequest(request,response);
 
+        if (controllers == null || urlMappings == null) {
+            throw new ServletException(
+                "Erreur : Listener non initialise ou donnees manquantes"
+            );
+        }
+
+        System.out.println("FrontController initialise !");
     }
 
     @Override
