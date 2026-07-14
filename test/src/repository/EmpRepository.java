@@ -1,43 +1,72 @@
 package repository;
 
+
 import model.Employee;
 import util.DatabaseConnection;
 
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+
+import org.springframework.stereotype.Repository;
 
 
+
+@Repository
 public class EmpRepository {
 
 
 
-    public List<Employee> findAll() throws Exception {
+    public List<Employee> findAll()
+            throws Exception {
 
 
-        List<Employee> employees = new ArrayList<>();
-        Connection conn = DatabaseConnection.getConnection();
-        
-        String sql = "SELECT id, nom FROM employee";
-        PreparedStatement ps = conn.prepareStatement(sql);
+        List<Employee> employees =
+                new ArrayList<>();
 
-        ResultSet rs = ps.executeQuery();
+
+        Connection conn =
+                DatabaseConnection.getConnection();
+
+
+        String sql =
+                "SELECT id,nom FROM employee";
+
+
+        PreparedStatement ps =
+                conn.prepareStatement(sql);
+
+
+        ResultSet rs =
+                ps.executeQuery();
+
+
 
         while(rs.next()){
 
 
-            Employee emp = new Employee();
+            Employee emp =
+                    new Employee();
 
 
-            emp.setId(rs.getInt("id"));
-            emp.setNom(rs.getString("nom"));
+            emp.setId(
+                    rs.getInt("id")
+            );
+
+
+            emp.setNom(
+                    rs.getString("nom")
+            );
+
+
             employees.add(emp);
 
         }
 
+
         rs.close();
         ps.close();
         conn.close();
+
 
         return employees;
 
