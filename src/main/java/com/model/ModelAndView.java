@@ -5,39 +5,49 @@ import java.util.Map;
 
 public class ModelAndView {
 
-
     private String url;
-
-    private Map<String,Object> attribute;
-
+    private Map<String,Object> attributes;
 
 
     public ModelAndView(String url){
 
         this.url = url;
-        this.attribute = new HashMap<>();
+        this.attributes = new HashMap<>();
 
     }
-
 
 
     public String getUrl(){
 
         return url;
+
     }
 
 
+    public void setUrl(String url){
 
-    public Map<String,Object> getAttribute(){
+        this.url = url;
 
-        return attribute;
     }
-
 
 
     public void addAttribute(String key,Object value){
 
-        attribute.put(key,value);
+        attributes.put(key,value);
+
+    }
+
+
+    public Object getAttribute(String key){
+
+        return attributes.get(key);
+
+    }
+
+
+    public Map<String,Object> getListAttributes(){
+
+        return attributes;
 
     }
 

@@ -3,25 +3,29 @@ package controller;
 import com.annotation.Controllerako;
 import com.annotation.UrlMapping;
 import com.model.ModelAndView;
-import service.EmpService;
+
 import model.Employee;
+import service.EmpService;
+
 import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 
 @Controllerako
+@Component
 public class EmpController{
+
+    @Autowired
+    private EmpService service;
 
     @UrlMapping(value="/", method="GET")
     public ModelAndView list() throws Exception {
-
-
-        EmpService service = new EmpService();
-
+        
         List<Employee> employees = service.getEmployees();
-
         ModelAndView mv = new ModelAndView("emp");
         mv.addAttribute("employees",employees);
-
         return mv;
 
     }

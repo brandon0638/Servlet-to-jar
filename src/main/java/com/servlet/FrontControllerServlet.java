@@ -1,69 +1,48 @@
 package com.servlet;
 
-import com.util.*;
 import com.model.ModelAndView;
+import com.util.AnnotationUtil;
+import com.util.RouteMapping;
+import com.util.UrlMethod;
 
 import javax.servlet.*;
 import javax.servlet.http.*;
-import java.io.*;
-import java.lang.reflect.Method;
-import java.util.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.Map;
+import org.springframework.context.ApplicationContext;
+
 
 public class FrontControllerServlet extends HttpServlet {
 
 
-    private List<Class<?>> controllers;
-
-    private Map<UrlMethod, Method> urlMappings;
-
+    private Map<UrlMethod,RouteMapping> routes;
     private String prefix;
-
     private String suffix;
-
-
+    private ApplicationContext springContext;
 
     @Override
     public void init() throws ServletException {
-
-
         ServletContext context = getServletContext();
 
 
-        // Récupération des données initialisées par le Listener
+        routes = (Map<UrlMethod,RouteMapping>)context.getAttribute("routes");
+        springContext = (ApplicationContext)context.getAttribute("springContext");
+        prefix = (String)context.getAttribute("prefix");
+        suffix = (String)context.getAttribute("suffix");
 
-        controllers = (List<Class<?>>) context.getAttribute("controllers");
+        if(routes == null){
 
-
-        urlMappings = (Map<UrlMethod, Method>) context.getAttribute("urlMappings");
-
-
-
-        // Récupération prefix et suffix depuis web.xml
-
-        prefix = context.getInitParameter("prefix");
-
-        suffix = context.getInitParameter("suffix");
-
-
-
-        if(controllers == null || urlMappings == null){
-
-            throw new ServletException("Erreur : Listener non initialise");
+            throw new ServletException("Routes non initialisees");
 
         }
-
-
-        System.out.println("FrontController initialise !");
+        
+        System.out.println("FrontController initialise");
 
     }
 
-
-
-
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-
-
+    protected void doGet(HttpServletRequest request,HttpServletResponse response) throws ServletException,IOException {
         processRequest(request,response);
 
         if (controllers == null || urlMappings == null) {
@@ -75,159 +54,45 @@ public class FrontControllerServlet extends HttpServlet {
         System.out.println("FrontController initialise !");
     }
 
-
-
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-
-
+    protected void doPost(HttpServletRequest request,HttpServletResponse response) throws ServletException,IOException {
         processRequest(request,response);
 
     }
 
-
-
-
-
-    protected void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-
-
+    private void processRequest(HttpServletRequest request,HttpServletResponse response) throws ServletException,IOException {
 
         String contextPath = request.getContextPath();
-
-
         String uri = request.getRequestURI();
+        String url = uri.substring(contextPath.length());
+        String method = request.getMethod().toUpperCase();
 
+        UrlMethod key = new UrlMethod(url,method);
 
-        String url = uri.substring(contextPath.length()).trim();
+        try {
 
+            RouteMapping route = AnnotationUtil.getRoute(key,routes);
 
+            Object result = AnnotationUtil.invoke(route,springContext);
 
-        String httpMethod =
-            request.getMethod()
-                   .trim()
-                   .toUpperCase();
+            if(result instanceof ModelAndView){
 
+                ModelAndView mv = (ModelAndView) result;
 
-
-
-        UrlMethod key = new UrlMethod(url,httpMethod);
-
-        if(urlMappings.containsKey(key)){
-
-
-
-            Method method = urlMappings.get(key);
-
-            try {
-
-
-
-                // création du controller
-
-                Object controller =
-                    method.getDeclaringClass()
-                          .getDeclaredConstructor()
-                          .newInstance();
-
-
-
-
-                // appel de la méthode
-
-                Object result = method.invoke(controller);
-
-                if(result instanceof ModelAndView){
-
-
-
-                    ModelAndView mv = (ModelAndView) result;
-
-                    for(String attributeName : mv.getAttribute().keySet()){
-
-                        request.setAttribute(attributeName,mv.getAttribute().get(attributeName));
-
-                    }
-
-
-                    String page = prefix + mv.getUrl() + suffix;
-
-                    RequestDispatcher dispatcher =request.getRequestDispatcher(page);
-
-                    dispatcher.forward(request,response);
-
-
-
-                }else{
-
-
-                    // Cas où le controller retourne autre chose
-
-                    response.setContentType("text/html;charset=UTF-8");
-
-
-                    PrintWriter out = response.getWriter();
-
-
-                    out.println(result);
-
-
+                for(Map.Entry<String,Object> entry : mv.getListAttributes().entrySet()){
+                    request.setAttribute(entry.getKey(),entry.getValue());
                 }
 
-
-
-
-
-            }catch(Exception e){
-
-
-                throw new ServletException("Erreur invocation controller", e);
-
+                String page = prefix + mv.getUrl() + suffix;
+                RequestDispatcher dispatcher = request.getRequestDispatcher(page);
+                dispatcher.forward(request,response);
+            }else{
+                response.setContentType("text/html;charset=UTF-8");
+                PrintWriter out = response.getWriter();
+                out.println(result);
             }
-
-
-
-
-
-        }else{
-
-
-
-            response.setContentType("text/html;charset=UTF-8");
-
-
-            PrintWriter out = response.getWriter();
-
-
-
-            out.println("<h1>404 NOT FOUND</h1>");
-
-            out.println("<p>Route inexistante : " + url + "</p>");
-
-
-
-            out.println("<h3>Routes disponibles :</h3>");
-
-            out.println("<ul>");
-
-
-
-            for(UrlMethod u : urlMappings.keySet()){
-
-
-                out.println("<li>" + u.getMethod() + " " + u.getUrl() + "</li>");
-
-
-            }
-
-
-            out.println("</ul>");
-
+        }catch(Exception e){
+            throw new ServletException("Erreur invocation controller",e);
         }
-
-
     }
-
-    }
-
 }
