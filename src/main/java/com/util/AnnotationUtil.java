@@ -2,6 +2,7 @@ package com.util;
 
 import com.annotation.Controllerako;
 import com.annotation.UrlMapping;
+import com.annotation.WebAPI;
 import com.exception.UrlNotFoundException;
 
 import java.io.File;
@@ -9,6 +10,8 @@ import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
 import org.springframework.context.ApplicationContext;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class AnnotationUtil {
 
@@ -158,5 +161,22 @@ public class AnnotationUtil {
 
 
         return route;
+    }
+
+
+    public static boolean isMethodReturnJSON(Method method){
+        return method.isAnnotationPresent(WebAPI.class);
+    }
+
+    public static String toJSON(Object object){
+        ObjectMapper mapper = new ObjectMapper();
+
+        try{
+            return mapper
+                    .writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(object);
+        }catch(JsonProcessingException e){
+            throw new RuntimeException("Erreur lors de la conversion en JSON",e);
+        }
     }
 }
