@@ -330,12 +330,12 @@ public class AnnotationUtil {
             || type == char.class;
     }
 
+    
     private static Object bindObject(String prefix,Class<?> type,HttpServletRequest request) throws Exception {
 
         
         Object object = type.getDeclaredConstructor().newInstance();
 
-        // Examiner les propriétés JavaBean : id, nom, etc.
         PropertyDescriptor[] properties =
             Introspector.getBeanInfo(type, Object.class)
                         .getPropertyDescriptors();
@@ -344,41 +344,61 @@ public class AnnotationUtil {
 
             Method setter = property.getWriteMethod();
 
-            // Ignorer les propriétés qui n'ont pas de setter
             if (setter == null) {
                 continue;
             }
 
             String propertyName = property.getName();
-
-            
             String parameterName = prefix + "." + propertyName;
-
-            String value = request.getParameter(parameterName);
-
-            // Si le paramètre n'a pas été envoyé, on garde la valeur par défaut de la propriété.
-            if (value == null) {
-                continue;
-            }
-
             Class<?> propertyType = property.getPropertyType();
 
-            
-            if (!isSimpleType(propertyType)) {
-                throw new IllegalArgumentException(
-                    "La propriete '" + propertyName
-                    + "' de " + type.getSimpleName()
-                    + " n'est pas un type simple. "
-                    + "Les objets imbriques seront traites dans une prochaine etape."
+            if (isSimpleType(propertyType)) {
+
+                // Propriété simple : employee.id, employee.nom...
+                String value = request.getParameter(parameterName);
+
+                if (value == null) {
+                    continue;
+                }
+
+                Object convertedValue =
+                    convertParameter(value, propertyType);
+
+                setter.invoke(object, convertedValue);
+
+            } else {
+
+                // Propriété objet : employee.adresse...
+                if (!hasParametersWithPrefix(
+                        request, parameterName + ".")) {
+                    continue;
+                }
+
+                
+                Object nestedObject = bindObject(
+                    parameterName,
+                    propertyType,
+                    request
                 );
+
+                setter.invoke(object, nestedObject);
             }
-
-            Object convertedValue = convertParameter(value, propertyType);
-
-            // Appeler automatiquement le setter, par exemple setNom(...)
-            setter.invoke(object, convertedValue);
         }
 
         return object;
     }
+
+    
+    private static boolean hasParametersWithPrefix(HttpServletRequest request,String prefix) {
+
+        for (String parameterName : request.getParameterMap().keySet()) {
+            if (parameterName.startsWith(prefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
 }
