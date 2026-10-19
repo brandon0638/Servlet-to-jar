@@ -108,48 +108,51 @@ public class AnnotationUtil {
         }
     }
 
-    /*
-     * Sprint 7
-
-     */
+    
     public static Object invoke(RouteMapping route,ApplicationContext springContext,HttpServletRequest request) throws Exception {
 
         Object controller = springContext.getBean(route.getController());
 
         Method method = route.getMethod();
-
         Parameter[] parameters = method.getParameters();
 
         Object[] arguments = new Object[parameters.length];
 
-        for(int i = 0; i < parameters.length; i++) {
+        for (int i = 0; i < parameters.length; i++) {
 
             Parameter parameter = parameters[i];
 
-            
-            //Verification de @Param
-             
-            if(!parameter.isAnnotationPresent(
-                    Param.class)) {
-
-                throw new RuntimeException("Le parametre '" + parameter.getName() + "' de la methode " + method.getName() + " doit utiliser @Param");
+            if (!parameter.isAnnotationPresent(Param.class)) {
+                throw new RuntimeException(
+                    "Le parametre '" + parameter.getName()
+                    + "' de la methode " + method.getName()
+                    + " doit utiliser @Param"
+                );
             }
 
             Param param = parameter.getAnnotation(Param.class);
-
             String parameterName = param.value();
+            Class<?> parameterType = parameter.getType();
 
-            
-           
-             
-            String value = request.getParameter(parameterName);
+            if (isSimpleType(parameterType)) {
 
-            
-            arguments[i] = convertParameter(value,parameter.getType());
+                // Sprint 7 : binding d'une valeur simple
+                String value = request.getParameter(parameterName);
+
+                arguments[i] = convertParameter(value, parameterType);
+
+            } else {
+
+                // Sprint 7-bis : binding d'un objet simple
+                arguments[i] = bindObject(
+                    parameterName,
+                    parameterType,
+                    request
+                );
+            }
         }
 
-        
-        return method.invoke(controller,arguments);
+        return method.invoke(controller, arguments);
     }
 
     
