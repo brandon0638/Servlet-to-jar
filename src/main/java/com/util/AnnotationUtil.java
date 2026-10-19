@@ -13,6 +13,8 @@ import java.net.URL;
 import java.util.*;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -331,9 +333,9 @@ public class AnnotationUtil {
     }
 
     
+    
     private static Object bindObject(String prefix,Class<?> type,HttpServletRequest request) throws Exception {
 
-        
         Object object = type.getDeclaredConstructor().newInstance();
 
         PropertyDescriptor[] properties =
@@ -352,9 +354,9 @@ public class AnnotationUtil {
             String parameterName = prefix + "." + propertyName;
             Class<?> propertyType = property.getPropertyType();
 
+            // Cas 1 : propriété simple
             if (isSimpleType(propertyType)) {
 
-                // Propriété simple : employee.id, employee.nom...
                 String value = request.getParameter(parameterName);
 
                 if (value == null) {
@@ -365,16 +367,33 @@ public class AnnotationUtil {
                     convertParameter(value, propertyType);
 
                 setter.invoke(object, convertedValue);
+            }
 
-            } else {
+            // Cas 2 : liste d'objets
+            else if (List.class.isAssignableFrom(propertyType)) {
 
-                // Propriété objet : employee.adresse...
+                if (!hasParametersWithPrefix(
+                        request, parameterName + "[")) {
+                    continue;
+                }
+
+                List<Object> list = bindList(
+                    parameterName,
+                    setter,
+                    request
+                );
+
+                setter.invoke(object, list);
+            }
+
+            // Cas 3 : objet imbriqué
+            else {
+
                 if (!hasParametersWithPrefix(
                         request, parameterName + ".")) {
                     continue;
                 }
 
-                
                 Object nestedObject = bindObject(
                     parameterName,
                     propertyType,
@@ -387,6 +406,7 @@ public class AnnotationUtil {
 
         return object;
     }
+
 
     
     private static boolean hasParametersWithPrefix(HttpServletRequest request,String prefix) {
