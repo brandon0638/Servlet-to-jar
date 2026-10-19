@@ -537,16 +537,15 @@ public class AnnotationUtil {
 
     private static MapFile bindFile(String parameterName,HttpServletRequest request) throws Exception {
 
-        Part part;
+        String contentType = request.getContentType();
 
-        try {
-            part = request.getPart(parameterName);
-        } catch (IllegalStateException e) {
-            throw new IllegalArgumentException(
-                "La requete doit etre de type multipart/form-data",
-                e
-            );
+        // Pas de formulaire multipart : aucun fichier à récupérer
+        if (contentType == null ||
+            !contentType.toLowerCase().startsWith("multipart/")) {
+            return null;
         }
+
+        Part part = request.getPart(parameterName);
 
         if (part == null || part.getSize() == 0) {
             return null;
@@ -554,33 +553,28 @@ public class AnnotationUtil {
 
         String submittedFileName = part.getSubmittedFileName();
 
-        if (submittedFileName == null || submittedFileName.trim().isEmpty()) {
+        if (submittedFileName == null ||
+            submittedFileName.trim().isEmpty()) {
             return null;
         }
 
-        // Ne conserver que le nom, sans chemin local éventuel
         String fileName = submittedFileName.replace('\\', '/');
-
         int lastSlash = fileName.lastIndexOf('/');
 
         if (lastSlash >= 0) {
             fileName = fileName.substring(lastSlash + 1);
         }
 
-        // Extraire l'extension, sans le point
         int lastDot = fileName.lastIndexOf('.');
-
         String extension = "";
 
         if (lastDot > 0 && lastDot < fileName.length() - 1) {
             extension = fileName.substring(lastDot + 1);
         }
 
-        // Lire le contenu binaire du fichier
         ByteArrayOutputStream output = new ByteArrayOutputStream();
 
         try (InputStream input = part.getInputStream()) {
-
             byte[] buffer = new byte[4096];
             int length;
 
@@ -589,11 +583,7 @@ public class AnnotationUtil {
             }
         }
 
-        return new MapFile(
-            fileName,
-            extension,
-            output.toByteArray()
-        );
+        return new MapFile(fileName, extension, output.toByteArray());
     }
 
 
