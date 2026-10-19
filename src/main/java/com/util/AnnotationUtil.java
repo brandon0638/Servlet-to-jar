@@ -11,6 +11,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URL;
 import java.util.*;
+import java.beans.Introspector;
+import java.beans.PropertyDescriptor;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -305,5 +307,78 @@ public class AnnotationUtil {
 
             throw new RuntimeException("Erreur lors de la conversion en JSON",e);
         }
+    }
+
+    private static boolean isSimpleType(Class<?> type) {
+
+        return type == String.class
+            || type == Integer.class
+            || type == int.class
+            || type == Long.class
+            || type == long.class
+            || type == Double.class
+            || type == double.class
+            || type == Float.class
+            || type == float.class
+            || type == Boolean.class
+            || type == boolean.class
+            || type == Short.class
+            || type == short.class
+            || type == Byte.class
+            || type == byte.class
+            || type == Character.class
+            || type == char.class;
+    }
+
+    private static Object bindObject(String prefix,Class<?> type,HttpServletRequest request) throws Exception {
+
+        
+        Object object = type.getDeclaredConstructor().newInstance();
+
+        // Examiner les propriétés JavaBean : id, nom, etc.
+        PropertyDescriptor[] properties =
+            Introspector.getBeanInfo(type, Object.class)
+                        .getPropertyDescriptors();
+
+        for (PropertyDescriptor property : properties) {
+
+            Method setter = property.getWriteMethod();
+
+            // Ignorer les propriétés qui n'ont pas de setter
+            if (setter == null) {
+                continue;
+            }
+
+            String propertyName = property.getName();
+
+            
+            String parameterName = prefix + "." + propertyName;
+
+            String value = request.getParameter(parameterName);
+
+            // Si le paramètre n'a pas été envoyé, on garde la valeur par défaut de la propriété.
+            if (value == null) {
+                continue;
+            }
+
+            Class<?> propertyType = property.getPropertyType();
+
+            
+            if (!isSimpleType(propertyType)) {
+                throw new IllegalArgumentException(
+                    "La propriete '" + propertyName
+                    + "' de " + type.getSimpleName()
+                    + " n'est pas un type simple. "
+                    + "Les objets imbriques seront traites dans une prochaine etape."
+                );
+            }
+
+            Object convertedValue = convertParameter(value, propertyType);
+
+            // Appeler automatiquement le setter, par exemple setNom(...)
+            setter.invoke(object, convertedValue);
+        }
+
+        return object;
     }
 }
