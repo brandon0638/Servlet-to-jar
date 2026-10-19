@@ -420,5 +420,102 @@ public class AnnotationUtil {
         return false;
     }
 
+    
+    private static List<Object> bindList(String prefix,Method setter,HttpServletRequest request) throws Exception {
+
+        
+        Type genericType = setter.getGenericParameterTypes()[0];
+
+        if (!(genericType instanceof ParameterizedType)) {
+            throw new IllegalArgumentException(
+                "La liste doit declarer son type generique : List<Adresse>"
+            );
+        }
+
+        ParameterizedType parameterizedType = (ParameterizedType) genericType;
+
+        Type elementType = parameterizedType.getActualTypeArguments()[0];
+
+        if (!(elementType instanceof Class<?>)) {
+            throw new IllegalArgumentException(
+                "Le type des elements de la liste n'est pas supporte"
+            );
+        }
+
+        Class<?> elementClass = (Class<?>) elementType;
+
+        
+        Set<Integer> indices = new TreeSet<>();
+
+        String indexPrefix = prefix + "[";
+
+        for (String parameterName : request.getParameterMap().keySet()) {
+
+            if (!parameterName.startsWith(indexPrefix)) {
+                continue;
+            }
+
+            int start = indexPrefix.length();
+            int end = parameterName.indexOf("]", start);
+
+            if (end == -1) {
+                continue;
+            }
+
+            String indexText = parameterName.substring(start, end);
+
+            try {
+                int index = Integer.parseInt(indexText);
+
+                if (index < 0) {
+                    continue;
+                }
+
+                // Vérifier que le paramètre suit la forme [index].propriete
+                if (end + 1 < parameterName.length()
+                        && parameterName.charAt(end + 1) == '.') {
+                    indices.add(index);
+                }
+
+            } catch (NumberFormatException e) {
+                // Ignorer les indices qui ne sont pas des nombres.
+            }
+        }
+
+        List<Object> result = new ArrayList<>();
+
+        for (Integer index : indices) {
+
+            String objectPrefix = prefix + "[" + index + "]";
+
+            if (isSimpleType(elementClass)) {
+
+                
+                String value = request.getParameter(objectPrefix);
+
+                if (value == null) {
+                    throw new IllegalArgumentException(
+                        "Valeur manquante pour " + objectPrefix
+                    );
+                }
+
+                result.add(convertParameter(value, elementClass));
+
+            } else {
+
+                Object element = bindObject(
+                    objectPrefix,
+                    elementClass,
+                    request
+                );
+
+                result.add(element);
+            }
+        }
+
+        return result;
+    }
+
+
 
 }
