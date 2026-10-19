@@ -5,6 +5,7 @@ import com.annotation.UrlMapping;
 import com.annotation.WebAPI;
 import com.annotation.Param;
 import com.exception.UrlNotFoundException;
+import com.model.MapFile;
 
 import java.io.File;
 import java.lang.reflect.Method;
@@ -15,7 +16,10 @@ import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 
+import javax.servlet.http.Part;
 import javax.servlet.http.HttpServletRequest;
 
 import org.springframework.context.ApplicationContext;
@@ -334,10 +338,13 @@ public class AnnotationUtil {
 
     
     
+    
     private static Object bindObject(String prefix,Class<?> type,HttpServletRequest request) throws Exception {
 
+        
         Object object = type.getDeclaredConstructor().newInstance();
 
+       
         PropertyDescriptor[] properties =
             Introspector.getBeanInfo(type, Object.class)
                         .getPropertyDescriptors();
@@ -346,6 +353,7 @@ public class AnnotationUtil {
 
             Method setter = property.getWriteMethod();
 
+            // Ignorer les propriétés sans setter
             if (setter == null) {
                 continue;
             }
@@ -354,7 +362,7 @@ public class AnnotationUtil {
             String parameterName = prefix + "." + propertyName;
             Class<?> propertyType = property.getPropertyType();
 
-            // Cas 1 : propriété simple
+            // CAS 1 : propriété simple (String, Integer, int...)
             if (isSimpleType(propertyType)) {
 
                 String value = request.getParameter(parameterName);
@@ -369,7 +377,17 @@ public class AnnotationUtil {
                 setter.invoke(object, convertedValue);
             }
 
-            // Cas 2 : liste d'objets
+            // CAS 2 : propriété de type MapFile (upload de fichier)
+            else if (propertyType == MapFile.class) {
+
+                MapFile mapFile = bindFile(parameterName, request);
+
+                if (mapFile != null) {
+                    setter.invoke(object, mapFile);
+                }
+            }
+
+            // CAS 3 : propriété de type List
             else if (List.class.isAssignableFrom(propertyType)) {
 
                 if (!hasParametersWithPrefix(
@@ -386,7 +404,7 @@ public class AnnotationUtil {
                 setter.invoke(object, list);
             }
 
-            // Cas 3 : objet imbriqué
+            // CAS 4 : objet imbriqué
             else {
 
                 if (!hasParametersWithPrefix(
@@ -406,6 +424,7 @@ public class AnnotationUtil {
 
         return object;
     }
+
 
 
     
@@ -514,6 +533,67 @@ public class AnnotationUtil {
         }
 
         return result;
+    }
+
+    private static MapFile bindFile(String parameterName,HttpServletRequest request) throws Exception {
+
+        Part part;
+
+        try {
+            part = request.getPart(parameterName);
+        } catch (IllegalStateException e) {
+            throw new IllegalArgumentException(
+                "La requete doit etre de type multipart/form-data",
+                e
+            );
+        }
+
+        if (part == null || part.getSize() == 0) {
+            return null;
+        }
+
+        String submittedFileName = part.getSubmittedFileName();
+
+        if (submittedFileName == null || submittedFileName.trim().isEmpty()) {
+            return null;
+        }
+
+        // Ne conserver que le nom, sans chemin local éventuel
+        String fileName = submittedFileName.replace('\\', '/');
+
+        int lastSlash = fileName.lastIndexOf('/');
+
+        if (lastSlash >= 0) {
+            fileName = fileName.substring(lastSlash + 1);
+        }
+
+        // Extraire l'extension, sans le point
+        int lastDot = fileName.lastIndexOf('.');
+
+        String extension = "";
+
+        if (lastDot > 0 && lastDot < fileName.length() - 1) {
+            extension = fileName.substring(lastDot + 1);
+        }
+
+        // Lire le contenu binaire du fichier
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        try (InputStream input = part.getInputStream()) {
+
+            byte[] buffer = new byte[4096];
+            int length;
+
+            while ((length = input.read(buffer)) != -1) {
+                output.write(buffer, 0, length);
+            }
+        }
+
+        return new MapFile(
+            fileName,
+            extension,
+            output.toByteArray()
+        );
     }
 
 
