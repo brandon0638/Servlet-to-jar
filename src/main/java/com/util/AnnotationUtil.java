@@ -11,6 +11,10 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URL;
 import java.util.*;
+import java.beans.Introspector;
+import java.beans.PropertyDescriptor;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -108,48 +112,51 @@ public class AnnotationUtil {
         }
     }
 
-    /*
-     * Sprint 7
-
-     */
+    
     public static Object invoke(RouteMapping route,ApplicationContext springContext,HttpServletRequest request) throws Exception {
 
         Object controller = springContext.getBean(route.getController());
 
         Method method = route.getMethod();
-
         Parameter[] parameters = method.getParameters();
 
         Object[] arguments = new Object[parameters.length];
 
-        for(int i = 0; i < parameters.length; i++) {
+        for (int i = 0; i < parameters.length; i++) {
 
             Parameter parameter = parameters[i];
 
-            
-            //Verification de @Param
-             
-            if(!parameter.isAnnotationPresent(
-                    Param.class)) {
-
-                throw new RuntimeException("Le parametre '" + parameter.getName() + "' de la methode " + method.getName() + " doit utiliser @Param");
+            if (!parameter.isAnnotationPresent(Param.class)) {
+                throw new RuntimeException(
+                    "Le parametre '" + parameter.getName()
+                    + "' de la methode " + method.getName()
+                    + " doit utiliser @Param"
+                );
             }
 
             Param param = parameter.getAnnotation(Param.class);
-
             String parameterName = param.value();
+            Class<?> parameterType = parameter.getType();
 
-            
-           
-             
-            String value = request.getParameter(parameterName);
+            if (isSimpleType(parameterType)) {
 
-            
-            arguments[i] = convertParameter(value,parameter.getType());
+                // Sprint 7 : binding d'une valeur simple
+                String value = request.getParameter(parameterName);
+
+                arguments[i] = convertParameter(value, parameterType);
+
+            } else {
+
+                // Sprint 7-bis : binding d'un objet simple
+                arguments[i] = bindObject(
+                    parameterName,
+                    parameterType,
+                    request
+                );
+            }
         }
 
-        
-        return method.invoke(controller,arguments);
+        return method.invoke(controller, arguments);
     }
 
     
@@ -303,4 +310,212 @@ public class AnnotationUtil {
             throw new RuntimeException("Erreur lors de la conversion en JSON",e);
         }
     }
+
+    private static boolean isSimpleType(Class<?> type) {
+
+        return type == String.class
+            || type == Integer.class
+            || type == int.class
+            || type == Long.class
+            || type == long.class
+            || type == Double.class
+            || type == double.class
+            || type == Float.class
+            || type == float.class
+            || type == Boolean.class
+            || type == boolean.class
+            || type == Short.class
+            || type == short.class
+            || type == Byte.class
+            || type == byte.class
+            || type == Character.class
+            || type == char.class;
+    }
+
+    
+    
+    private static Object bindObject(String prefix,Class<?> type,HttpServletRequest request) throws Exception {
+
+        Object object = type.getDeclaredConstructor().newInstance();
+
+        PropertyDescriptor[] properties =
+            Introspector.getBeanInfo(type, Object.class)
+                        .getPropertyDescriptors();
+
+        for (PropertyDescriptor property : properties) {
+
+            Method setter = property.getWriteMethod();
+
+            if (setter == null) {
+                continue;
+            }
+
+            String propertyName = property.getName();
+            String parameterName = prefix + "." + propertyName;
+            Class<?> propertyType = property.getPropertyType();
+
+            // Cas 1 : propriété simple
+            if (isSimpleType(propertyType)) {
+
+                String value = request.getParameter(parameterName);
+
+                if (value == null) {
+                    continue;
+                }
+
+                Object convertedValue =
+                    convertParameter(value, propertyType);
+
+                setter.invoke(object, convertedValue);
+            }
+
+            // Cas 2 : liste d'objets
+            else if (List.class.isAssignableFrom(propertyType)) {
+
+                if (!hasParametersWithPrefix(
+                        request, parameterName + "[")) {
+                    continue;
+                }
+
+                List<Object> list = bindList(
+                    parameterName,
+                    setter,
+                    request
+                );
+
+                setter.invoke(object, list);
+            }
+
+            // Cas 3 : objet imbriqué
+            else {
+
+                if (!hasParametersWithPrefix(
+                        request, parameterName + ".")) {
+                    continue;
+                }
+
+                Object nestedObject = bindObject(
+                    parameterName,
+                    propertyType,
+                    request
+                );
+
+                setter.invoke(object, nestedObject);
+            }
+        }
+
+        return object;
+    }
+
+
+    
+    private static boolean hasParametersWithPrefix(HttpServletRequest request,String prefix) {
+
+        for (String parameterName : request.getParameterMap().keySet()) {
+            if (parameterName.startsWith(prefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    
+    private static List<Object> bindList(String prefix,Method setter,HttpServletRequest request) throws Exception {
+
+        
+        Type genericType = setter.getGenericParameterTypes()[0];
+
+        if (!(genericType instanceof ParameterizedType)) {
+            throw new IllegalArgumentException(
+                "La liste doit declarer son type generique : List<Adresse>"
+            );
+        }
+
+        ParameterizedType parameterizedType = (ParameterizedType) genericType;
+
+        Type elementType = parameterizedType.getActualTypeArguments()[0];
+
+        if (!(elementType instanceof Class<?>)) {
+            throw new IllegalArgumentException(
+                "Le type des elements de la liste n'est pas supporte"
+            );
+        }
+
+        Class<?> elementClass = (Class<?>) elementType;
+
+        
+        Set<Integer> indices = new TreeSet<>();
+
+        String indexPrefix = prefix + "[";
+
+        for (String parameterName : request.getParameterMap().keySet()) {
+
+            if (!parameterName.startsWith(indexPrefix)) {
+                continue;
+            }
+
+            int start = indexPrefix.length();
+            int end = parameterName.indexOf("]", start);
+
+            if (end == -1) {
+                continue;
+            }
+
+            String indexText = parameterName.substring(start, end);
+
+            try {
+                int index = Integer.parseInt(indexText);
+
+                if (index < 0) {
+                    continue;
+                }
+
+                // Vérifier que le paramètre suit la forme [index].propriete
+                if (end + 1 < parameterName.length()
+                        && parameterName.charAt(end + 1) == '.') {
+                    indices.add(index);
+                }
+
+            } catch (NumberFormatException e) {
+                // Ignorer les indices qui ne sont pas des nombres.
+            }
+        }
+
+        List<Object> result = new ArrayList<>();
+
+        for (Integer index : indices) {
+
+            String objectPrefix = prefix + "[" + index + "]";
+
+            if (isSimpleType(elementClass)) {
+
+                
+                String value = request.getParameter(objectPrefix);
+
+                if (value == null) {
+                    throw new IllegalArgumentException(
+                        "Valeur manquante pour " + objectPrefix
+                    );
+                }
+
+                result.add(convertParameter(value, elementClass));
+
+            } else {
+
+                Object element = bindObject(
+                    objectPrefix,
+                    elementClass,
+                    request
+                );
+
+                result.add(element);
+            }
+        }
+
+        return result;
+    }
+
+
+
 }
