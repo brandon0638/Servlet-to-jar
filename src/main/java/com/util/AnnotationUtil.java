@@ -52,6 +52,7 @@ public class AnnotationUtil {
         }
     }
 
+    //rendre findClasse recursive pour scanner les sous dossier 
     private static List<Class<?>> findClasses(File directory,String packageName) throws Exception {
 
         List<Class<?>> result = new ArrayList<>();
@@ -68,7 +69,15 @@ public class AnnotationUtil {
 
         for(File file : files) {
 
-            if(file.getName().endsWith(".class")) {
+            if(file.isDirectory()) {
+
+                // Récursion dans les sous-packages
+                result.addAll(findClasses(
+                    file,
+                    packageName + "." + file.getName()
+                ));
+
+            } else if(file.getName().endsWith(".class")) {
 
                 String className = packageName + "." + file.getName().replace(".class", "");
 
@@ -81,12 +90,19 @@ public class AnnotationUtil {
 
     public static void scanControllersInPackage(String basePackage,Map<UrlMethod, RouteMapping> routes) throws Exception {
 
-        scanPackage(basePackage);
+        List<Class<?>> classes = new ArrayList<>();
+        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+        String path = basePackage.replace(".", "/");
+        Enumeration<URL> resources = loader.getResources(path);
+
+        while(resources.hasMoreElements()) {
+            URL resource = resources.nextElement();
+            File directory = new File(resource.toURI());
+            classes.addAll(findClasses(directory, basePackage));
+        }
 
         for(Class<?> c : classes) {
-
             if(c.isAnnotationPresent(Controllerako.class)) {
-
                 scanMethod(routes, c);
             }
         }
@@ -120,15 +136,14 @@ public class AnnotationUtil {
     public static Object invoke(RouteMapping route,ApplicationContext springContext,HttpServletRequest request) throws Exception {
 
         Object controller = springContext.getBean(route.getController());
-
         Method method = route.getMethod();
         Parameter[] parameters = method.getParameters();
-
         Object[] arguments = new Object[parameters.length];
 
         for (int i = 0; i < parameters.length; i++) {
 
             Parameter parameter = parameters[i];
+            Class<?> parameterType = parameter.getType();
 
             if (!parameter.isAnnotationPresent(Param.class)) {
                 throw new RuntimeException(
@@ -140,23 +155,12 @@ public class AnnotationUtil {
 
             Param param = parameter.getAnnotation(Param.class);
             String parameterName = param.value();
-            Class<?> parameterType = parameter.getType();
 
             if (isSimpleType(parameterType)) {
-
-                // Sprint 7 : binding d'une valeur simple
                 String value = request.getParameter(parameterName);
-
                 arguments[i] = convertParameter(value, parameterType);
-
             } else {
-
-                // Sprint 7-bis : binding d'un objet simple
-                arguments[i] = bindObject(
-                    parameterName,
-                    parameterType,
-                    request
-                );
+                arguments[i] = bindObject(parameterName, parameterType, request);
             }
         }
 
@@ -341,7 +345,10 @@ public class AnnotationUtil {
     
     private static Object bindObject(String prefix,Class<?> type,HttpServletRequest request) throws Exception {
 
-        
+        // Force Tomcat à parser les paramètres multipart
+        // avant tout getParameter()
+        forceMultipartParsing(request);
+
         Object object = type.getDeclaredConstructor().newInstance();
 
        
@@ -423,6 +430,23 @@ public class AnnotationUtil {
         }
 
         return object;
+    }
+
+
+    private static void forceMultipartParsing(HttpServletRequest request) {
+        String contentType = request.getContentType();
+        if (contentType == null || !contentType.toLowerCase().startsWith("multipart/")) {
+            return;
+        }
+        try {
+            // Lire toutes les parts déclenche le parsing des paramètres texte
+            for (Part part : request.getParts()) {
+                // on ne fait rien, la lecture suffit
+                part.getName();
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur parsing multipart", e);
+        }
     }
 
 
