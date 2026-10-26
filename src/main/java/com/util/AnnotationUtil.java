@@ -6,6 +6,7 @@ import com.annotation.WebAPI;
 import com.annotation.Param;
 import com.exception.UrlNotFoundException;
 import com.model.MapFile;
+import com.session.SessionAko;
 
 import java.io.File;
 import java.lang.reflect.Method;
@@ -19,6 +20,8 @@ import java.lang.reflect.Type;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 
+import javax.servlet.ServletContext;
+import javax.servlet.http.HttpSession;
 import javax.servlet.http.Part;
 import javax.servlet.http.HttpServletRequest;
 
@@ -144,6 +147,12 @@ public class AnnotationUtil {
 
             Parameter parameter = parameters[i];
             Class<?> parameterType = parameter.getType();
+
+            // Sprint 9 : injection de SessionAko
+            if (parameterType == SessionAko.class) {
+                arguments[i] = getOrCreateSession(request);
+                continue;
+            }
 
             if (!parameter.isAnnotationPresent(Param.class)) {
                 throw new RuntimeException(
@@ -608,6 +617,40 @@ public class AnnotationUtil {
         }
 
         return new MapFile(fileName, extension, output.toByteArray());
+    }
+
+
+    private static final String SESSIONS_ATTRIBUTE = "sessions";
+
+    @SuppressWarnings("unchecked")
+    private static SessionAko getOrCreateSession(HttpServletRequest request) {
+
+        ServletContext context = request.getServletContext();
+
+        // Recuperation map depuis ServletContext
+        Map<String, SessionAko> sessions =
+            (Map<String, SessionAko>) context.getAttribute(SESSIONS_ATTRIBUTE);
+
+        // cree ra tsy mi existe
+        if (sessions == null) {
+            sessions = new HashMap<>();
+            context.setAttribute(SESSIONS_ATTRIBUTE, sessions);
+        }
+
+        // recuperation id Httpsession
+        HttpSession httpSession = request.getSession();
+        String id = httpSession.getId();
+
+        // verifiena ra efa mi existe ao @map le id
+        SessionAko existing = sessions.get(id);
+        if (existing != null) {
+            return existing;  // → récupérer l'instance existante
+        }
+
+        // cree et ajouter sinon
+        SessionAko newSession = new SessionAko(httpSession);
+        sessions.put(id, newSession);
+        return newSession;
     }
 
 
