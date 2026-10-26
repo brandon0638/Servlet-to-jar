@@ -4,6 +4,7 @@ import com.model.ModelAndView;
 import com.util.AnnotationUtil;
 import com.util.RouteMapping;
 import com.util.UrlMethod;
+import com.exception.UrlNotFoundException;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
@@ -130,7 +131,14 @@ public class FrontControllerServlet extends HttpServlet {
                 out.println(result);
             }
 
-        } catch(Exception e) {
+        } catch (UrlNotFoundException e) {
+
+            // 404 explicite
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            response.setContentType("text/plain;charset=UTF-8");
+            response.getWriter().println(e.getMessage());
+
+        }catch(Exception e) {
 
             throw new ServletException("Erreur invocation controller",e);
         }

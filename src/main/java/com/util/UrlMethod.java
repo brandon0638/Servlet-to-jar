@@ -10,7 +10,7 @@ public class UrlMethod {
 
     public UrlMethod(String url, String method) {
         this.url = url;
-        this.method = method.toUpperCase();
+        this.method = (method == null ? "GET" : method.toUpperCase());
     }
 
 

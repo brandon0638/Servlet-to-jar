@@ -6,6 +6,7 @@ import com.annotation.WebAPI;
 import com.annotation.Param;
 import com.exception.UrlNotFoundException;
 import com.model.MapFile;
+import com.session.SessionAko;
 
 import java.io.File;
 import java.lang.reflect.Method;
@@ -19,6 +20,8 @@ import java.lang.reflect.Type;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 
+import javax.servlet.ServletContext;
+import javax.servlet.http.HttpSession;
 import javax.servlet.http.Part;
 import javax.servlet.http.HttpServletRequest;
 
@@ -52,6 +55,7 @@ public class AnnotationUtil {
         }
     }
 
+    //rendre findClasse recursive pour scanner les sous dossier 
     private static List<Class<?>> findClasses(File directory,String packageName) throws Exception {
 
         List<Class<?>> result = new ArrayList<>();
@@ -68,7 +72,15 @@ public class AnnotationUtil {
 
         for(File file : files) {
 
-            if(file.getName().endsWith(".class")) {
+            if(file.isDirectory()) {
+
+                // Récursion dans les sous-packages
+                result.addAll(findClasses(
+                    file,
+                    packageName + "." + file.getName()
+                ));
+
+            } else if(file.getName().endsWith(".class")) {
 
                 String className = packageName + "." + file.getName().replace(".class", "");
 
@@ -81,12 +93,19 @@ public class AnnotationUtil {
 
     public static void scanControllersInPackage(String basePackage,Map<UrlMethod, RouteMapping> routes) throws Exception {
 
-        scanPackage(basePackage);
+        List<Class<?>> classes = new ArrayList<>();
+        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+        String path = basePackage.replace(".", "/");
+        Enumeration<URL> resources = loader.getResources(path);
+
+        while(resources.hasMoreElements()) {
+            URL resource = resources.nextElement();
+            File directory = new File(resource.toURI());
+            classes.addAll(findClasses(directory, basePackage));
+        }
 
         for(Class<?> c : classes) {
-
             if(c.isAnnotationPresent(Controllerako.class)) {
-
                 scanMethod(routes, c);
             }
         }
@@ -120,15 +139,20 @@ public class AnnotationUtil {
     public static Object invoke(RouteMapping route,ApplicationContext springContext,HttpServletRequest request) throws Exception {
 
         Object controller = springContext.getBean(route.getController());
-
         Method method = route.getMethod();
         Parameter[] parameters = method.getParameters();
-
         Object[] arguments = new Object[parameters.length];
 
         for (int i = 0; i < parameters.length; i++) {
 
             Parameter parameter = parameters[i];
+            Class<?> parameterType = parameter.getType();
+
+            // Sprint 9 : injection de SessionAko
+            if (parameterType == SessionAko.class) {
+                arguments[i] = getOrCreateSession(request);
+                continue;
+            }
 
             if (!parameter.isAnnotationPresent(Param.class)) {
                 throw new RuntimeException(
@@ -140,23 +164,12 @@ public class AnnotationUtil {
 
             Param param = parameter.getAnnotation(Param.class);
             String parameterName = param.value();
-            Class<?> parameterType = parameter.getType();
 
             if (isSimpleType(parameterType)) {
-
-                // Sprint 7 : binding d'une valeur simple
                 String value = request.getParameter(parameterName);
-
                 arguments[i] = convertParameter(value, parameterType);
-
             } else {
-
-                // Sprint 7-bis : binding d'un objet simple
-                arguments[i] = bindObject(
-                    parameterName,
-                    parameterType,
-                    request
-                );
+                arguments[i] = bindObject(parameterName, parameterType, request);
             }
         }
 
@@ -341,7 +354,10 @@ public class AnnotationUtil {
     
     private static Object bindObject(String prefix,Class<?> type,HttpServletRequest request) throws Exception {
 
-        
+        // Force Tomcat à parser les paramètres multipart
+        // avant tout getParameter()
+        forceMultipartParsing(request);
+
         Object object = type.getDeclaredConstructor().newInstance();
 
        
@@ -423,6 +439,23 @@ public class AnnotationUtil {
         }
 
         return object;
+    }
+
+
+    private static void forceMultipartParsing(HttpServletRequest request) {
+        String contentType = request.getContentType();
+        if (contentType == null || !contentType.toLowerCase().startsWith("multipart/")) {
+            return;
+        }
+        try {
+            // Lire toutes les parts déclenche le parsing des paramètres texte
+            for (Part part : request.getParts()) {
+                // on ne fait rien, la lecture suffit
+                part.getName();
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur parsing multipart", e);
+        }
     }
 
 
@@ -584,6 +617,40 @@ public class AnnotationUtil {
         }
 
         return new MapFile(fileName, extension, output.toByteArray());
+    }
+
+
+    private static final String SESSIONS_ATTRIBUTE = "sessions";
+
+    @SuppressWarnings("unchecked")
+    private static SessionAko getOrCreateSession(HttpServletRequest request) {
+
+        ServletContext context = request.getServletContext();
+
+        // Recuperation map depuis ServletContext
+        Map<String, SessionAko> sessions =
+            (Map<String, SessionAko>) context.getAttribute(SESSIONS_ATTRIBUTE);
+
+        // cree ra tsy mi existe
+        if (sessions == null) {
+            sessions = new HashMap<>();
+            context.setAttribute(SESSIONS_ATTRIBUTE, sessions);
+        }
+
+        // recuperation id Httpsession
+        HttpSession httpSession = request.getSession();
+        String id = httpSession.getId();
+
+        // verifiena ra efa mi existe ao @map le id
+        SessionAko existing = sessions.get(id);
+        if (existing != null) {
+            return existing;  // → récupérer l'instance existante
+        }
+
+        // cree et ajouter sinon
+        SessionAko newSession = new SessionAko(httpSession);
+        sessions.put(id, newSession);
+        return newSession;
     }
 
 
