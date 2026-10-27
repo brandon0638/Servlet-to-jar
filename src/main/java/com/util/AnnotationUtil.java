@@ -4,7 +4,9 @@ import com.annotation.Controllerako;
 import com.annotation.UrlMapping;
 import com.annotation.WebAPI;
 import com.annotation.Param;
+import com.annotation.Auth;
 import com.exception.UrlNotFoundException;
+import com.exception.UnauthorizedException;
 import com.model.MapFile;
 import com.session.SessionAko;
 
@@ -21,9 +23,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 
 import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import javax.servlet.http.Part;
-import javax.servlet.http.HttpServletRequest;
 
 import org.springframework.context.ApplicationContext;
 
@@ -33,6 +35,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class AnnotationUtil {
 
     private static List<Class<?>> classes = new ArrayList<>();
+
+    private static final String SESSIONS_ATTRIBUTE = "sessions";
+
+    
+    // Scan des packages
+   
 
     public static void scanPackage(String basePackage) throws Exception {
 
@@ -50,12 +58,10 @@ public class AnnotationUtil {
 
             File directory = new File(resource.toURI());
 
-            classes.addAll(findClasses(directory, basePackage)
-            );
+            classes.addAll(findClasses(directory, basePackage));
         }
     }
 
-    //rendre findClasse recursive pour scanner les sous dossier 
     private static List<Class<?>> findClasses(File directory,String packageName) throws Exception {
 
         List<Class<?>> result = new ArrayList<>();
@@ -72,14 +78,12 @@ public class AnnotationUtil {
 
         for(File file : files) {
 
+            // Sprint 1 : scan récursif des sous-packages
             if(file.isDirectory()) {
-
-                // Récursion dans les sous-packages
                 result.addAll(findClasses(
                     file,
                     packageName + "." + file.getName()
                 ));
-
             } else if(file.getName().endsWith(".class")) {
 
                 String className = packageName + "." + file.getName().replace(".class", "");
@@ -93,18 +97,10 @@ public class AnnotationUtil {
 
     public static void scanControllersInPackage(String basePackage,Map<UrlMethod, RouteMapping> routes) throws Exception {
 
-        List<Class<?>> classes = new ArrayList<>();
-        ClassLoader loader = Thread.currentThread().getContextClassLoader();
-        String path = basePackage.replace(".", "/");
-        Enumeration<URL> resources = loader.getResources(path);
-
-        while(resources.hasMoreElements()) {
-            URL resource = resources.nextElement();
-            File directory = new File(resource.toURI());
-            classes.addAll(findClasses(directory, basePackage));
-        }
+        scanPackage(basePackage);
 
         for(Class<?> c : classes) {
+
             if(c.isAnnotationPresent(Controllerako.class)) {
                 scanMethod(routes, c);
             }
@@ -124,7 +120,6 @@ public class AnnotationUtil {
                 RouteMapping route = new RouteMapping(controller,method);
 
                 if(routes.containsKey(key)) {
-
                     throw new RuntimeException("Route deja utilisée : " + key.getMethod() + " " + key.getUrl());
                 }
 
@@ -136,10 +131,19 @@ public class AnnotationUtil {
     }
 
     
-    public static Object invoke(RouteMapping route,ApplicationContext springContext,HttpServletRequest request) throws Exception {
+    // Invocation (Sprint 7 / 7-bis / 8 / 9 / 10)
+    
+
+    public static Object invoke(RouteMapping route,
+                                ApplicationContext springContext,
+                                HttpServletRequest request) throws Exception {
+
+        Method method = route.getMethod();
+
+        // Sprint 10 : vérification d'authentification (avant tout)
+        checkAuth(method, request);
 
         Object controller = springContext.getBean(route.getController());
-        Method method = route.getMethod();
         Parameter[] parameters = method.getParameters();
         Object[] arguments = new Object[parameters.length];
 
@@ -148,12 +152,25 @@ public class AnnotationUtil {
             Parameter parameter = parameters[i];
             Class<?> parameterType = parameter.getType();
 
-            // Sprint 9 : injection de SessionAko
+            // Sprint 9 : injection automatique de SessionAko
             if (parameterType == SessionAko.class) {
                 arguments[i] = getOrCreateSession(request);
                 continue;
             }
 
+            // Injection automatique de HttpServletRequest
+            if (parameterType == HttpServletRequest.class) {
+                arguments[i] = request;
+                continue;
+            }
+
+            // Injection automatique de HttpSession
+            if (parameterType == HttpSession.class) {
+                arguments[i] = request.getSession();
+                continue;
+            }
+
+            // Sprint 7 : binding obligatoire avec @Param
             if (!parameter.isAnnotationPresent(Param.class)) {
                 throw new RuntimeException(
                     "Le parametre '" + parameter.getName()
@@ -177,110 +194,104 @@ public class AnnotationUtil {
     }
 
     
+    // Sprint 10 : vérification d'authentification
+    
+
+    private static void checkAuth(Method method, HttpServletRequest request) {
+
+        // Pas de @Auth → pas de vérification
+        if (!method.isAnnotationPresent(Auth.class)) {
+            return;
+        }
+
+        // Récupérer la clé de session configurée dans web.xml
+        String authSessionKey =
+            (String) request.getServletContext().getAttribute("authSessionKey");
+
+        if (authSessionKey == null || authSessionKey.trim().isEmpty()) {
+            throw new UnauthorizedException(
+                "Configuration manquante : 'authSessionKey' non defini dans web.xml"
+            );
+        }
+
+        // Vérifier si la clé existe en session
+        Object user = request.getSession().getAttribute(authSessionKey);
+
+        if (user == null) {
+            throw new UnauthorizedException(
+                "Authentification requise pour acceder a " + method.getName()
+            );
+        }
+    }
+
+    
+    // Sprint 9 : gestion de la session
+    
+
+    @SuppressWarnings("unchecked")
+    private static SessionAko getOrCreateSession(HttpServletRequest request) {
+
+        ServletContext context = request.getServletContext();
+
+        Map<String, SessionAko> sessions =
+            (Map<String, SessionAko>) context.getAttribute(SESSIONS_ATTRIBUTE);
+
+        if (sessions == null) {
+            sessions = new HashMap<>();
+            context.setAttribute(SESSIONS_ATTRIBUTE, sessions);
+        }
+
+        HttpSession httpSession = request.getSession();
+        String id = httpSession.getId();
+
+        SessionAko existing = sessions.get(id);
+        if (existing != null) {
+            return existing;
+        }
+
+        SessionAko newSession = new SessionAko(httpSession);
+        sessions.put(id, newSession);
+        return newSession;
+    }
+
+    
+    // Sprint 7 : binding simple
+   
+
     private static Object convertParameter(String value,Class<?> type) {
 
-        
         if(value == null) {
-
             if(type.isPrimitive()) {
-
                 throw new IllegalArgumentException("Impossible de donner null " + "au type primitif " + type.getSimpleName());
             }
-
             return null;
         }
 
-       
-        if(type == String.class) {
-            return value;
-        }
-
-        
-        if(type == Integer.class) {
-            return Integer.valueOf(value);
-        }
-
-        
-        if(type == int.class) {
-            return Integer.parseInt(value);
-        }
-
-        if(type == Long.class) {
-            return Long.valueOf(value);
-        }
-
-        
-        if(type == long.class) {
-            return Long.parseLong(value);
-        }
-
-        
-        if(type == Double.class) {
-            return Double.valueOf(value);
-        }
-
-       
-        if(type == double.class) {
-            return Double.parseDouble(value);
-        }
-
-        
-        if(type == Float.class) {
-            return Float.valueOf(value);
-        }
-
-        
-        if(type == float.class) {
-            return Float.parseFloat(value);
-        }
-
-        
-        if(type == Boolean.class) {
-            return Boolean.valueOf(value);
-        }
-
-        
-        if(type == boolean.class) {
-            return Boolean.parseBoolean(value);
-        }
-
-        
-        if(type == Short.class) {
-            return Short.valueOf(value);
-        }
-
-       
-        if(type == short.class) {
-            return Short.parseShort(value);
-        }
-
-      
-        if(type == Byte.class) {
-            return Byte.valueOf(value);
-        }
-
-        
-        if(type == byte.class) {
-            return Byte.parseByte(value);
-        }
+        if(type == String.class) return value;
+        if(type == Integer.class) return Integer.valueOf(value);
+        if(type == int.class) return Integer.parseInt(value);
+        if(type == Long.class) return Long.valueOf(value);
+        if(type == long.class) return Long.parseLong(value);
+        if(type == Double.class) return Double.valueOf(value);
+        if(type == double.class) return Double.parseDouble(value);
+        if(type == Float.class) return Float.valueOf(value);
+        if(type == float.class) return Float.parseFloat(value);
+        if(type == Boolean.class) return Boolean.valueOf(value);
+        if(type == boolean.class) return Boolean.parseBoolean(value);
+        if(type == Short.class) return Short.valueOf(value);
+        if(type == short.class) return Short.parseShort(value);
+        if(type == Byte.class) return Byte.valueOf(value);
+        if(type == byte.class) return Byte.parseByte(value);
 
         if(type == Character.class) {
-
-            if(value.isEmpty()) {
-                return null;
-            }
-
+            if(value.isEmpty()) return null;
             return value.charAt(0);
         }
 
-        
         if(type == char.class) {
-
             if(value.isEmpty()) {
-
                 throw new IllegalArgumentException("Impossible de convertir une " + "valeur vide en char");
             }
-
             return value.charAt(0);
         }
 
@@ -294,11 +305,9 @@ public class AnnotationUtil {
         if(route == null) {
 
             StringBuilder msg = new StringBuilder();
-
             msg.append("Route inexistante : ").append(key.getMethod()).append(" ").append(key.getUrl()).append("\n\nRoutes disponibles :\n");
 
             for(Map.Entry<UrlMethod,RouteMapping> e : routes.entrySet()) {
-
                 msg.append(e.getKey().getMethod()).append(" ").append(e.getKey().getUrl()).append(" -> ").append(e.getValue().getController().getSimpleName()).append(".").append(e.getValue().getMethod().getName()).append("\n");
             }
 
@@ -308,9 +317,7 @@ public class AnnotationUtil {
         return route;
     }
 
-   
     public static boolean isMethodReturnJSON(Method method) {
-
         return method.isAnnotationPresent(WebAPI.class);
     }
 
@@ -319,11 +326,8 @@ public class AnnotationUtil {
         ObjectMapper mapper = new ObjectMapper();
 
         try {
-
             return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(object);
-
         } catch(JsonProcessingException e) {
-
             throw new RuntimeException("Erreur lors de la conversion en JSON",e);
         }
     }
@@ -331,36 +335,26 @@ public class AnnotationUtil {
     private static boolean isSimpleType(Class<?> type) {
 
         return type == String.class
-            || type == Integer.class
-            || type == int.class
-            || type == Long.class
-            || type == long.class
-            || type == Double.class
-            || type == double.class
-            || type == Float.class
-            || type == float.class
-            || type == Boolean.class
-            || type == boolean.class
-            || type == Short.class
-            || type == short.class
-            || type == Byte.class
-            || type == byte.class
-            || type == Character.class
-            || type == char.class;
+            || type == Integer.class || type == int.class
+            || type == Long.class || type == long.class
+            || type == Double.class || type == double.class
+            || type == Float.class || type == float.class
+            || type == Boolean.class || type == boolean.class
+            || type == Short.class || type == short.class
+            || type == Byte.class || type == byte.class
+            || type == Character.class || type == char.class;
     }
 
     
-    
-    
+    // Sprint 7-bis : binding objet
+   
+
     private static Object bindObject(String prefix,Class<?> type,HttpServletRequest request) throws Exception {
 
-        // Force Tomcat à parser les paramètres multipart
-        // avant tout getParameter()
         forceMultipartParsing(request);
 
         Object object = type.getDeclaredConstructor().newInstance();
 
-       
         PropertyDescriptor[] properties =
             Introspector.getBeanInfo(type, Object.class)
                         .getPropertyDescriptors();
@@ -368,72 +362,39 @@ public class AnnotationUtil {
         for (PropertyDescriptor property : properties) {
 
             Method setter = property.getWriteMethod();
-
-            // Ignorer les propriétés sans setter
-            if (setter == null) {
-                continue;
-            }
+            if (setter == null) continue;
 
             String propertyName = property.getName();
             String parameterName = prefix + "." + propertyName;
             Class<?> propertyType = property.getPropertyType();
 
-            // CAS 1 : propriété simple (String, Integer, int...)
             if (isSimpleType(propertyType)) {
 
                 String value = request.getParameter(parameterName);
+                if (value == null) continue;
 
-                if (value == null) {
-                    continue;
-                }
-
-                Object convertedValue =
-                    convertParameter(value, propertyType);
-
+                Object convertedValue = convertParameter(value, propertyType);
                 setter.invoke(object, convertedValue);
-            }
 
-            // CAS 2 : propriété de type MapFile (upload de fichier)
-            else if (propertyType == MapFile.class) {
+            } else if (propertyType == MapFile.class) {
 
                 MapFile mapFile = bindFile(parameterName, request);
-
                 if (mapFile != null) {
                     setter.invoke(object, mapFile);
                 }
-            }
 
-            // CAS 3 : propriété de type List
-            else if (List.class.isAssignableFrom(propertyType)) {
+            } else if (List.class.isAssignableFrom(propertyType)) {
 
-                if (!hasParametersWithPrefix(
-                        request, parameterName + "[")) {
-                    continue;
-                }
+                if (!hasParametersWithPrefix(request, parameterName + "[")) continue;
 
-                List<Object> list = bindList(
-                    parameterName,
-                    setter,
-                    request
-                );
-
+                List<Object> list = bindList(parameterName, setter, request);
                 setter.invoke(object, list);
-            }
 
-            // CAS 4 : objet imbriqué
-            else {
+            } else {
 
-                if (!hasParametersWithPrefix(
-                        request, parameterName + ".")) {
-                    continue;
-                }
+                if (!hasParametersWithPrefix(request, parameterName + ".")) continue;
 
-                Object nestedObject = bindObject(
-                    parameterName,
-                    propertyType,
-                    request
-                );
-
+                Object nestedObject = bindObject(parameterName, propertyType, request);
                 setter.invoke(object, nestedObject);
             }
         }
@@ -441,41 +402,31 @@ public class AnnotationUtil {
         return object;
     }
 
-
     private static void forceMultipartParsing(HttpServletRequest request) {
         String contentType = request.getContentType();
         if (contentType == null || !contentType.toLowerCase().startsWith("multipart/")) {
             return;
         }
         try {
-            // Lire toutes les parts déclenche le parsing des paramètres texte
             for (Part part : request.getParts()) {
-                // on ne fait rien, la lecture suffit
-                part.getName();
+                part.getName(); // lecture = déclenche le parsing
             }
         } catch (Exception e) {
             throw new RuntimeException("Erreur parsing multipart", e);
         }
     }
 
-
-
-    
     private static boolean hasParametersWithPrefix(HttpServletRequest request,String prefix) {
 
         for (String parameterName : request.getParameterMap().keySet()) {
-            if (parameterName.startsWith(prefix)) {
-                return true;
-            }
+            if (parameterName.startsWith(prefix)) return true;
         }
 
         return false;
     }
 
-    
     private static List<Object> bindList(String prefix,Method setter,HttpServletRequest request) throws Exception {
 
-        
         Type genericType = setter.getGenericParameterTypes()[0];
 
         if (!(genericType instanceof ParameterizedType)) {
@@ -485,7 +436,6 @@ public class AnnotationUtil {
         }
 
         ParameterizedType parameterizedType = (ParameterizedType) genericType;
-
         Type elementType = parameterizedType.getActualTypeArguments()[0];
 
         if (!(elementType instanceof Class<?>)) {
@@ -495,42 +445,31 @@ public class AnnotationUtil {
         }
 
         Class<?> elementClass = (Class<?>) elementType;
-
-        
         Set<Integer> indices = new TreeSet<>();
 
         String indexPrefix = prefix + "[";
 
         for (String parameterName : request.getParameterMap().keySet()) {
 
-            if (!parameterName.startsWith(indexPrefix)) {
-                continue;
-            }
+            if (!parameterName.startsWith(indexPrefix)) continue;
 
             int start = indexPrefix.length();
             int end = parameterName.indexOf("]", start);
 
-            if (end == -1) {
-                continue;
-            }
+            if (end == -1) continue;
 
             String indexText = parameterName.substring(start, end);
 
             try {
                 int index = Integer.parseInt(indexText);
+                if (index < 0) continue;
 
-                if (index < 0) {
-                    continue;
-                }
-
-                // Vérifier que le paramètre suit la forme [index].propriete
                 if (end + 1 < parameterName.length()
                         && parameterName.charAt(end + 1) == '.') {
                     indices.add(index);
                 }
-
             } catch (NumberFormatException e) {
-                // Ignorer les indices qui ne sont pas des nombres.
+                // ignorer
             }
         }
 
@@ -541,26 +480,13 @@ public class AnnotationUtil {
             String objectPrefix = prefix + "[" + index + "]";
 
             if (isSimpleType(elementClass)) {
-
-                
                 String value = request.getParameter(objectPrefix);
-
                 if (value == null) {
-                    throw new IllegalArgumentException(
-                        "Valeur manquante pour " + objectPrefix
-                    );
+                    throw new IllegalArgumentException("Valeur manquante pour " + objectPrefix);
                 }
-
                 result.add(convertParameter(value, elementClass));
-
             } else {
-
-                Object element = bindObject(
-                    objectPrefix,
-                    elementClass,
-                    request
-                );
-
+                Object element = bindObject(objectPrefix, elementClass, request);
                 result.add(element);
             }
         }
@@ -568,11 +494,14 @@ public class AnnotationUtil {
         return result;
     }
 
+    
+    // Sprint 8 : binding fichier
+    
+
     private static MapFile bindFile(String parameterName,HttpServletRequest request) throws Exception {
 
         String contentType = request.getContentType();
 
-        // Pas de formulaire multipart : aucun fichier à récupérer
         if (contentType == null ||
             !contentType.toLowerCase().startsWith("multipart/")) {
             return null;
@@ -586,8 +515,7 @@ public class AnnotationUtil {
 
         String submittedFileName = part.getSubmittedFileName();
 
-        if (submittedFileName == null ||
-            submittedFileName.trim().isEmpty()) {
+        if (submittedFileName == null || submittedFileName.trim().isEmpty()) {
             return null;
         }
 
@@ -618,41 +546,4 @@ public class AnnotationUtil {
 
         return new MapFile(fileName, extension, output.toByteArray());
     }
-
-
-    private static final String SESSIONS_ATTRIBUTE = "sessions";
-
-    @SuppressWarnings("unchecked")
-    private static SessionAko getOrCreateSession(HttpServletRequest request) {
-
-        ServletContext context = request.getServletContext();
-
-        // Recuperation map depuis ServletContext
-        Map<String, SessionAko> sessions =
-            (Map<String, SessionAko>) context.getAttribute(SESSIONS_ATTRIBUTE);
-
-        // cree ra tsy mi existe
-        if (sessions == null) {
-            sessions = new HashMap<>();
-            context.setAttribute(SESSIONS_ATTRIBUTE, sessions);
-        }
-
-        // recuperation id Httpsession
-        HttpSession httpSession = request.getSession();
-        String id = httpSession.getId();
-
-        // verifiena ra efa mi existe ao @map le id
-        SessionAko existing = sessions.get(id);
-        if (existing != null) {
-            return existing;  // → récupérer l'instance existante
-        }
-
-        // cree et ajouter sinon
-        SessionAko newSession = new SessionAko(httpSession);
-        sessions.put(id, newSession);
-        return newSession;
-    }
-
-
-
 }
