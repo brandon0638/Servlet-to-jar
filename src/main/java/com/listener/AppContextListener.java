@@ -1,6 +1,7 @@
 package com.listener;
 
 import com.annotation.Auth;
+import com.annotation.Role;
 import com.util.*;
 
 import javax.servlet.*;
@@ -40,11 +41,16 @@ public class AppContextListener implements ServletContextListener {
             String authSessionKey = context.getInitParameter("authSessionKey");
             context.setAttribute("authSessionKey", authSessionKey);
 
-            // 4.bis Validation : si @Auth est utilisée mais authSessionKey absente
+            // 5. Sprint 10-bis : rolesSessionKey
+            String rolesSessionKey = context.getInitParameter("rolesSessionKey");
+            context.setAttribute("rolesSessionKey", rolesSessionKey);
+
+            // 6. Validation : si @Auth utilisé mais authSessionKey absente
             if (authSessionKey == null || authSessionKey.trim().isEmpty()) {
                 boolean anyAuth = false;
                 for (RouteMapping r : routes.values()) {
-                    if (r.getMethod().isAnnotationPresent(Auth.class)) {
+                    if (r.getMethod().isAnnotationPresent(Auth.class)
+                        || r.getMethod().isAnnotationPresent(Role.class)) {
                         anyAuth = true;
                         break;
                     }
@@ -52,12 +58,29 @@ public class AppContextListener implements ServletContextListener {
                 if (anyAuth) {
                     throw new RuntimeException(
                         "La cle 'authSessionKey' doit etre configuree dans web.xml "
-                        + "car des methodes utilisent @Auth"
+                        + "car des methodes utilisent @Auth ou @Role"
                     );
                 }
             }
 
-            // 5. Stockage
+            // 7. Validation : si @Role utilisé mais rolesSessionKey absente
+            if (rolesSessionKey == null || rolesSessionKey.trim().isEmpty()) {
+                boolean anyRole = false;
+                for (RouteMapping r : routes.values()) {
+                    if (r.getMethod().isAnnotationPresent(Role.class)) {
+                        anyRole = true;
+                        break;
+                    }
+                }
+                if (anyRole) {
+                    throw new RuntimeException(
+                        "La cle 'rolesSessionKey' doit etre configuree dans web.xml "
+                        + "car des methodes utilisent @Role"
+                    );
+                }
+            }
+
+            // 8. Stockage
             context.setAttribute("routes", routes);
             context.setAttribute("springContext", springContext);
 
