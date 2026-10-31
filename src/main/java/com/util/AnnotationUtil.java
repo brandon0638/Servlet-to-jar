@@ -9,7 +9,11 @@ import com.exception.UrlNotFoundException;
 import com.exception.UnauthorizedException;
 import com.model.MapFile;
 import com.session.SessionAko;
+import com.annotation.Role;
+import com.exception.ForbiddenException;
 
+import java.util.Arrays;
+import java.util.List;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -199,12 +203,15 @@ public class AnnotationUtil {
 
     private static void checkAuth(Method method, HttpServletRequest request) {
 
-        // Pas de @Auth → pas de vérification
-        if (!method.isAnnotationPresent(Auth.class)) {
+        boolean hasAuth = method.isAnnotationPresent(Auth.class);
+        boolean hasRole = method.isAnnotationPresent(Role.class);
+
+        // Ni @Auth ni @Role → pas de vérification
+        if (!hasAuth && !hasRole) {
             return;
         }
 
-        // Récupérer la clé de session configurée dans web.xml
+        // Récupérer la clé de session pour l'authentification
         String authSessionKey =
             (String) request.getServletContext().getAttribute("authSessionKey");
 
@@ -214,13 +221,62 @@ public class AnnotationUtil {
             );
         }
 
-        // Vérifier si la clé existe en session
+        // Vérifier que l'utilisateur est connecté (Sprint 10)
         Object user = request.getSession().getAttribute(authSessionKey);
 
         if (user == null) {
             throw new UnauthorizedException(
                 "Authentification requise pour acceder a " + method.getName()
             );
+        }
+
+        // Sprint 10-bis : vérifier le(s) rôle(s) si @Role présent
+        if (hasRole) {
+
+            Role roleAnnotation = method.getAnnotation(Role.class);
+            String[] requiredRoles = roleAnnotation.value();
+
+            String rolesSessionKey =
+                (String) request.getServletContext().getAttribute("rolesSessionKey");
+
+            if (rolesSessionKey == null || rolesSessionKey.trim().isEmpty()) {
+                throw new ForbiddenException(
+                    "Configuration manquante : 'rolesSessionKey' non defini dans web.xml"
+                );
+            }
+
+            Object rolesObj = request.getSession().getAttribute(rolesSessionKey);
+
+            if (rolesObj == null) {
+                throw new ForbiddenException(
+                    "Aucun role en session. Requis : " + Arrays.toString(requiredRoles)
+                );
+            }
+
+            if (!(rolesObj instanceof List)) {
+                throw new ForbiddenException(
+                    "Le role en session doit etre une List<String>"
+                );
+            }
+
+            @SuppressWarnings("unchecked")
+            List<String> userRoles = (List<String>) rolesObj;
+
+            // OR logique : au moins un rôle requis doit être présent
+            boolean ok = false;
+            for (String required : requiredRoles) {
+                if (userRoles.contains(required)) {
+                    ok = true;
+                    break;
+                }
+            }
+
+            if (!ok) {
+                throw new ForbiddenException(
+                    "Role insuffisant. Requis : " + Arrays.toString(requiredRoles)
+                    + ", vous avez : " + userRoles
+                );
+            }
         }
     }
 

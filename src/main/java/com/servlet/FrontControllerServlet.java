@@ -5,6 +5,7 @@ import com.model.ModelAndView;
 import com.util.AnnotationUtil;
 import com.util.RouteMapping;
 import com.util.UrlMethod;
+import com.exception.ForbiddenException;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
@@ -110,6 +111,13 @@ public class FrontControllerServlet extends HttpServlet {
 
             // Sprint 10 : 401
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("text/plain;charset=UTF-8");
+            response.getWriter().println(e.getMessage());
+
+        } catch (ForbiddenException e) {
+
+            // 403 (Sprint 10-bis)
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setContentType("text/plain;charset=UTF-8");
             response.getWriter().println(e.getMessage());
 
